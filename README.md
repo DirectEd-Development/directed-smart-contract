@@ -1,2 +1,2 @@
 # directed-smart-contract
-Plutus scripts for DirectEd Smart Contract
+Plutus scripts for DirectEd Smart Contract.
