@@ -1,0 +1,60 @@
+cabal-version:      3.0
+name:               directed-smart-contract
+version:            0.1.0.0
+
+license: Apache-2.0
+license-files: LICENSE
+author:             Rohan Mitta
+maintainer:         mitta.rohan@gmail.com
+
+-- A copyright notice.
+-- copyright:
+-- category:
+-- extra-source-files: CHANGELOG.md
+
+flag defer-plugin-errors
+    description:
+        Defer errors from the plugin, useful for things like Haddock that can't handle it.
+    default: False
+    manual: True
+
+common lang
+    default-language:   Haskell2010 
+    ghc-options:
+      -Wall -Wnoncanonical-monad-instances
+      -Wincomplete-uni-patterns -Wincomplete-record-updates
+      -Wredundant-constraints -Widentities -rtsopts
+      -- See Plutus Tx readme
+      -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
+    if flag(defer-plugin-errors)
+        ghc-options: -fplugin-opt PlutusTx.Plugin:defer-errors
+        
+
+library
+  -- Include this to import the ghc-options and language above 
+    import: lang
+  -- This is the directory location where our onchain code files will go, and also a utility function for my project 
+    hs-source-dirs: src
+  -- These are the file names that will get called by our executable files listed below 
+    exposed-modules:
+  -- These are the imports needed for the source files. Always include  base >= 4.9 && < 5 for Haskell.                     
+    build-depends:
+      base >= 4.9 && < 5,
+      aeson -any,
+      bytestring -any,
+      containers -any,
+      freer-extras -any,
+      playground-common -any,
+      cardano-api,
+      cardano-crypto-class,
+      cardano-ledger-core,
+      serialise,
+      plutus-contract -any,
+      plutus-ledger -any,
+      plutus-ledger-api -any,
+      plutus-ledger-constraints -any,
+      plutus-tx -any,
+      plutus-tx-plugin -any,
+      text -any,
+      lens -any,
+

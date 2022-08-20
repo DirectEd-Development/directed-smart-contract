@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    # - path: "./src"
+    #   component: "NFT-Unlocked-Liquidity:lib:NFT-Unlocked-Liquidity"
+    # - path: "./app"
+    #   component: "NFT-Unlocked-Liquidity:exe:token-policy"
+    # - path: "./app"
+    #   component: "NFT-Unlocked-Liquidity:exe:checkToken-script"
+    # - path: "./app"
+    #   component: "NFT-Unlocked-Liquidity:exe:token-name"
