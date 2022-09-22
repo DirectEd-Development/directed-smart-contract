@@ -37,8 +37,8 @@ library
     hs-source-dirs: src
   -- These are the file names that will get called by our executable files listed below 
     exposed-modules:
-    AdmissionToken
-    Contract
+      AdmissionToken
+      SchoolToken
   -- These are the imports needed for the source files. Always include  base >= 4.9 && < 5 for Haskell.                     
     build-depends:
       base >= 4.9 && < 5,
