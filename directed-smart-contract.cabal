@@ -39,11 +39,6 @@ library
     exposed-modules:
     AdmissionToken
     Contract
-<<<<<<< HEAD
-      Contract
-=======
-      AdmissionToken
->>>>>>> main
   -- These are the imports needed for the source files. Always include  base >= 4.9 && < 5 for Haskell.                     
     build-depends:
       base >= 4.9 && < 5,
