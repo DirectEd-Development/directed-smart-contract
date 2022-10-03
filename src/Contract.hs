@@ -1,16 +1,17 @@
--- {-# LANGUAGE DataKinds           #-}
--- {-# LANGUAGE DeriveAnyClass      #-}
--- {-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveAnyClass      #-}
+{-# LANGUAGE DeriveGeneric       #-}
 -- {-# LANGUAGE FlexibleContexts    #-}
--- {-# LANGUAGE NoImplicitPrelude   #-}
--- {-# LANGUAGE OverloadedStrings   #-}
--- {-# LANGUAGE ScopedTypeVariables #-}
--- {-# LANGUAGE TemplateHaskell     #-}
--- {-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
--- {-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE TypeOperators       #-}
 -- {-# LANGUAGE NumericUnderscores  #-}
--- {-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-# OPTIONS_GHC -fno-ignore-interface-pragmas #-}
 
@@ -18,6 +19,10 @@ module Contract where
 
 import           Ledger                 hiding (mint, singleton)
 import qualified Ledger.Typed.Scripts   as Scripts
+import Plutus.Contract.StateMachine
+import          Data.Aeson
+import          GHC.Generics
+import qualified PlutusTx
 
 -- import           Control.Monad          hiding (fmap)
 -- import qualified Data.Map               as Map
@@ -26,42 +31,109 @@ import qualified Ledger.Typed.Scripts   as Scripts
 -- import           Plutus.Contract        as Contract
 -- import           Plutus.Trace.Emulator  as Emulator
 -- import qualified PlutusTx
--- import           PlutusTx.Prelude       hiding (Semigroup(..), unless)
+import           PlutusTx.Prelude       hiding (Semigroup(..), unless)
 -- import           Ledger                 hiding (mint, singleton)
--- import           Ledger.Constraints     as Constraints
--- import           Ledger.Ada             as Ada
+import           Ledger.Constraints     as Constraints
+import           Ledger.Ada             as Ada hiding (divide)
+-- import           Ledger.Contexts        as Contexts
+import           Ledger.Value           as Value
 -- import           Ledger.Contexts        as Contexts
 -- import           Ledger.Value           as Value
--- import           Prelude                (IO, Semigroup (..), Show (..), String)
+import           Prelude                (Show (..),Semigroup (..))
+import qualified Prelude
 -- import           Text.Printf            (printf)
 -- import           Wallet.Emulator.Wallet
 -- import           Test_Token2             as Test_Token
 -- import qualified Ledger.Constraints as Constraint
 -- import Plutus.Contract.Test.ContractModel (withdraw)
+import AdmissionToken
 
-data ContractDatum = False --Placeholder
 
-data ContractRedeemer = True --Placeholder
+data Scholarship = Scholarship
+    { sAuthority        :: !PaymentPubKeyHash
+    , sSchool           :: !PaymentPubKeyHash
+    , sCourseProvider   :: !PaymentPubKeyHash
+    , sAmount           :: !Integer
+    , sMilestones       :: !Integer
+    , sDeadline         :: !POSIXTime
+    , sToken            :: !ThreadToken
+    } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq)
 
-{-# INLINABLE mkValidator #-}
-mkValidator :: ContractDatum -> ContractRedeemer -> ScriptContext -> Bool
-mkValidator _ _ _ = undefined --Placeholder
+PlutusTx.makeLift ''Scholarship
 
-data ContractType
-instance Scripts.ValidatorTypes ContractType where
-    type instance DatumType ContractType = ContractDatum
-    type instance RedeemerType ContractType = ContractRedeemer
+newtype ContractRedeemer = ContractRedeemer {refund :: Bool} -- The only redeemer used is the one which says if the transaction is asking to refund a scholarship with a missed deadline.
+PlutusTx.unstableMakeIsData ''ContractRedeemer
 
-typedValidator :: Scripts.TypedValidator ContractType
-typedValidator = undefined --Placeholder
+type Milestone = Integer
 
-validator :: Validator
-validator = Scripts.validatorScript typedValidator
+data ContractDatum = ContractDatum PaymentPubKeyHash Milestone -- The state of the scholarship, whih says who it is for and which milestone they are on. 
+PlutusTx.unstableMakeIsData ''ContractDatum
 
-valHash :: Ledger.ValidatorHash
-valHash = Scripts.validatorHash typedValidator
+{-# INLINABLE lovelaces #-}
+lovelaces :: Ledger.Value -> Integer
+lovelaces = Ada.getLovelace . Ada.fromValue
 
-scrAddress ::  Ledger.Address
-scrAddress = scriptAddress validator
+--How do we set this up so that we can accept donations and then pool them into one scholarship?
+--A: We have two contracts. One for collection of money, and one for the individual scholarships. 
+--      -For now, we take this approach. In theory this could be combined into one SC if we don't use the StateMachine module, but instead build our own, where the first step of pooling money into a contract isn't tracked by a token.
+--How do we set this up so that the fees for minting are paid by the scholarship? (Point for later, don't worry right now)
+{-# INLINABLE transition #-}
+transition :: Scholarship -> State ContractDatum -> ContractRedeemer -> Maybe (TxConstraints Void Void, State ContractDatum)
+transition scholarship State {stateData,stateValue} contractRedeemer = case (stateData, stateValue, contractRedeemer) of
+  (_, _, ContractRedeemer True)                 -> Just ( Constraints.mustBeSignedBy (sAuthority scholarship) 
+                                                        , State stateData mempty ) --"Is this DirectEd asking for the refund? In futue version, also ask if it is passed the deadline?"
+
+  (ContractDatum pkh milestone, v, ContractRedeemer False)
+    | milestone < sMilestones scholarship       -> Just ( Constraints.mustBeSignedBy pkh           <>
+                                                          Constraints.mustMintValue (singleton (curSymbol $ sAuthority scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) (-1))
+  --THIS IS WHERE THE ERROR IS COMING FROM: Still curSymbol? Or is it TokenName part?
+  --We can try parameterizing some of these by adding them to the scholarship data.
+  --Or properly parameterizing...
+                                                          , State (ContractDatum pkh (milestone+1)) (v - lovelaceValueOf (divide (sAmount scholarship) (sMilestones scholarship))) )
+  --"Signed by pkh, burns milestone token, and next state has Amount/Milestones less value and milestone+1"
+  --Note that this assumes the format of the AdmissionToken's TokenName just a pkh
+  (ContractDatum pkh milestone, _, ContractRedeemer False)
+    | milestone == sMilestones scholarship      -> Just ( Constraints.mustBeSignedBy pkh
+                                                          , State (ContractDatum pkh (milestone+1)) mempty ) --"Signed by pkh and next state has empty value"
+
+  _                                             -> Nothing
+
+{-# INLINABLE final #-}
+final :: Scholarship -> ContractDatum -> Bool
+final scholarship (ContractDatum _ milestone) = sMilestones scholarship == milestone
+
+{-# INLINABLE contractStateMachine #-}
+contractStateMachine :: Scholarship -> StateMachine ContractDatum ContractRedeemer
+contractStateMachine scholarship = mkStateMachine
+    (Just $ sToken scholarship)
+    (transition scholarship)
+    (final scholarship)
+
+{-# INLINABLE mkContractValidator #-}
+mkContractValidator :: Scholarship -> ContractDatum -> ContractRedeemer -> ScriptContext -> Bool
+mkContractValidator scholarship = mkValidator $ contractStateMachine scholarship
+
+type ContractType = StateMachine ContractDatum ContractRedeemer
+
+--Here is where the error comes from.
+typedContractValidator :: Scholarship -> Scripts.TypedValidator ContractType
+typedContractValidator scholarship = Scripts.mkTypedValidator @ContractType
+    ($$(PlutusTx.compile [|| mkContractValidator ||])
+        `PlutusTx.applyCode` PlutusTx.liftCode scholarship)
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @ContractDatum @ContractRedeemer
+
+contractValidator :: Scholarship -> Validator
+contractValidator = Scripts.validatorScript . Contract.typedContractValidator
+
+contractValHash :: Scholarship -> Ledger.ValidatorHash
+contractValHash = Scripts.validatorHash . Contract.typedContractValidator
+
+contractScrAddress ::  Scholarship -> Ledger.Address
+contractScrAddress = scriptAddress . contractValidator
+
+contractClient :: Scholarship -> StateMachineClient ContractDatum ContractRedeemer
+contractClient scholarship = mkStateMachineClient $ StateMachineInstance (contractStateMachine scholarship) (typedContractValidator scholarship)
 
 

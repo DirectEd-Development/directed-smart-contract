@@ -35,23 +35,25 @@ mkPolicy authPkh () ctx = case flattenValue $ txInfoMint txInfo of
                             [(curSym,tn,n)]                                                          --We specifically demand that there is exactly one token being minted/burned so that we know it is the one from this script. Not sure how else to determine which token comes from this script? 
                               | n < 0 -> True --Burning is allowed.    
                               | n > 0 -> traceIfFalse "not signed by authority" signedByAuthority &&
-                                          traceIfFalse "must send to specified pkh" sentToNamedWallet --Checks format of the tokenname is 'AdmissionToken:<pkh>' and that the pkh corresponds to the address the token was sent to.                         
+                                          traceIfFalse "must send to specified pkh" sentToNamedWallet --Assumes the tokenName is exactly a pkh, and that the pkh corresponds to the address the token was sent to.                         
                               where
                                 txOuts = txInfoOutputs txInfo
                                 signedByAuthority = txSignedBy txInfo (unPaymentPubKeyHash authPkh)
                                 maybePkhReciever = find (\txOut -> valueOf (txOutValue txOut) curSym tn > 0) txOuts >>= toPubKeyHash . txOutAddress
-                                sentToNamedWallet = maybe False ((\pkh -> mappend "AdmissionToken:" pkh == unTokenName tn) . getPubKeyHash) maybePkhReciever
+                                sentToNamedWallet = maybe False ((==) (unTokenName tn) . getPubKeyHash) maybePkhReciever
 
                             _         -> traceIfFalse "Must mint/burn exactly one type of token" False
   where
     txInfo = scriptContextTxInfo ctx
 
+{-# INLINABLE policy #-}
 policy :: PaymentPubKeyHash -> Scripts.MintingPolicy
 policy pkh = mkMintingPolicyScript $
   $$(PlutusTx.compile [|| Scripts.wrapMintingPolicy . mkPolicy ||])
   `PlutusTx.applyCode`
   PlutusTx.liftCode pkh
 
+{-# INLINABLE curSymbol #-}
 curSymbol :: PaymentPubKeyHash -> CurrencySymbol
 curSymbol = scriptCurrencySymbol . policy
 
@@ -62,7 +64,7 @@ type TokenSchema = Endpoint "mint" (Integer, PaymentPubKeyHash)
 mint :: (Integer,PaymentPubKeyHash) -> Contract w TokenSchema Text ()
 mint (n,pkhReciever) = do
     pkh <- Contract.ownPaymentPubKeyHash
-    let tn = TokenName $  mappend "AdmissionToken:" $ getPubKeyHash . unPaymentPubKeyHash $ pkhReciever
+    let tn = TokenName $ getPubKeyHash . unPaymentPubKeyHash $ pkhReciever
         val = singleton (curSymbol pkh) tn n
         lookups = Constraints.mintingPolicy $ policy pkh
         tx = Constraints.mustMintValue val <> Constraints.mustPayToPubKey pkhReciever val
