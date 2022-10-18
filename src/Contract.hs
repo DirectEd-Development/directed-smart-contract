@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE DeriveAnyClass      #-}
 {-# LANGUAGE DeriveGeneric       #-}
--- {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -9,7 +9,7 @@
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
--- {-# LANGUAGE NumericUnderscores  #-}
+{-# LANGUAGE NumericUnderscores  #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
@@ -46,13 +46,21 @@ import qualified Prelude
 -- import           Test_Token2             as Test_Token
 -- import qualified Ledger.Constraints as Constraint
 -- import Plutus.Contract.Test.ContractModel (withdraw)
+-- import           Text.Printf            (printf)
+-- import           Wallet.Emulator.Wallet
+-- import           Test_Token2             as Test_Token
+-- import qualified Ledger.Constraints as Constraint
+-- import Plutus.Contract.Test.ContractModel (withdraw)
+import PlutusTx.Builtins.Class (stringToBuiltinByteString, obfuscatedId)
 import AdmissionToken
+import Data.Text (pack)
 
 
 data Scholarship = Scholarship
     { sAuthority        :: !PaymentPubKeyHash
-    , sSchool           :: !PaymentPubKeyHash
-    , sCourseProvider   :: !PaymentPubKeyHash
+    , sAuthoritySym     :: !CurrencySymbol 
+    , sSchoolSym        :: !CurrencySymbol
+    , sCourseProviderSym:: !CurrencySymbol
     , sAmount           :: !Integer
     , sMilestones       :: !Integer
     , sDeadline         :: !POSIXTime
@@ -85,11 +93,8 @@ transition scholarship State {stateData,stateValue} contractRedeemer = case (sta
 
   (ContractDatum pkh milestone, v, ContractRedeemer False)
     | milestone < sMilestones scholarship       -> Just ( Constraints.mustBeSignedBy pkh           <>
-                                                          Constraints.mustMintValue (singleton (curSymbol $ sAuthority scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) (-1))
-  --THIS IS WHERE THE ERROR IS COMING FROM: Still curSymbol? Or is it TokenName part?
-  --We can try parameterizing some of these by adding them to the scholarship data.
-  --Or properly parameterizing...
-                                                          , State (ContractDatum pkh (milestone+1)) (v - lovelaceValueOf (divide (sAmount scholarship) (sMilestones scholarship))) )
+                                                          Constraints.mustMintValue (singleton (sCourseProviderSym scholarship) (TokenName $ appendByteString (stringToBuiltinByteString $ show milestone) $ getPubKeyHash (unPaymentPubKeyHash pkh)) (-1)) 
+                                                          , State (ContractDatum pkh (milestone+1)) (v - lovelaceValueOf (divide (sAmount scholarship) $ sMilestones scholarship)) )
   --"Signed by pkh, burns milestone token, and next state has Amount/Milestones less value and milestone+1"
   --Note that this assumes the format of the AdmissionToken's TokenName just a pkh
   (ContractDatum pkh milestone, _, ContractRedeemer False)
