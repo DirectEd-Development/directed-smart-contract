@@ -23,44 +23,23 @@ import Plutus.Contract.StateMachine
 import Data.Aeson ( FromJSON, ToJSON )
 import          GHC.Generics
 import qualified PlutusTx
-
--- import           Control.Monad          hiding (fmap)
--- import qualified Data.Map               as Map
--- import           Data.Text              (Text)
--- import           Data.Void              (Void)
--- import           Plutus.Contract        as Contract
--- import           Plutus.Trace.Emulator  as Emulator
--- import qualified PlutusTx
 import           PlutusTx.Prelude       hiding (Semigroup(..), unless)
--- import           Ledger                 hiding (mint, singleton)
 import           Ledger.Constraints     as Constraints
 import           Ledger.Ada             as Ada hiding (divide)
--- import           Ledger.Contexts        as Contexts
 import           Ledger.Value           as Value
--- import           Ledger.Contexts        as Contexts
--- import           Ledger.Value           as Value
 import           Prelude                (Show (..),Semigroup (..), String)
 import qualified Prelude
--- import           Text.Printf            (printf)
--- import           Wallet.Emulator.Wallet
--- import           Test_Token2             as Test_Token
--- import qualified Ledger.Constraints as Constraint
--- import Plutus.Contract.Test.ContractModel (withdraw)
--- import           Text.Printf            (printf)
--- import           Wallet.Emulator.Wallet
--- import           Test_Token2             as Test_Token
--- import qualified Ledger.Constraints as Constraint
--- import Plutus.Contract.Test.ContractModel (withdraw)
-import qualified VerifiedByToken
 import Data.Text (Text, pack)
 import Plutus.Contract as Contract
-import qualified Ledger.Constraints as Constraints
 import Control.Monad (void)
+import qualified VerifiedByToken
 
 data Scholarship = Scholarship
     { sAuthority        :: !PaymentPubKeyHash
     , sAuthoritySym     :: !CurrencySymbol 
+    , sSchool           :: !PaymentPubKeyHash 
     , sSchoolSym        :: !CurrencySymbol
+    , sCourseProvider   :: !PaymentPubKeyHash
     , sCourseProviderSym:: !CurrencySymbol
     , sAmount           :: !Integer
     , sMilestones       :: !Integer
@@ -149,7 +128,9 @@ data ScholarshipParams = ScholarshipParams
     { pRecipient        :: !PaymentPubKeyHash
     , pAuthority        :: !PaymentPubKeyHash
     , pAuthoritySym     :: !CurrencySymbol 
+    , pSchool           :: !PaymentPubKeyHash 
     , pSchoolSym        :: !CurrencySymbol
+    , pCourseProvider   :: !PaymentPubKeyHash
     , pCourseProviderSym:: !CurrencySymbol
     , pAmount           :: !Integer
     , pMilestones       :: !Integer
@@ -161,7 +142,9 @@ initScholarship sp = do
   let scholarship = Scholarship 
         { sAuthority        = pAuthority sp
         , sAuthoritySym     = pAuthoritySym sp
+        , sSchool           = pSchool sp 
         , sSchoolSym        = pSchoolSym sp
+        , sCourseProvider   = pCourseProvider sp
         , sCourseProviderSym= pCourseProviderSym sp
         , sAmount           = pAmount sp
         , sMilestones       = pMilestones sp
@@ -177,14 +160,16 @@ completeMilestone sp = do
   let scholarship = Scholarship 
         { sAuthority        = pAuthority sp
         , sAuthoritySym     = pAuthoritySym sp
+        , sSchool           = pSchool sp
         , sSchoolSym        = pSchoolSym sp
+        , sCourseProvider   = pCourseProvider sp 
         , sCourseProviderSym= pCourseProviderSym sp
         , sAmount           = pAmount sp
         , sMilestones       = pMilestones sp
         , sDeadline         = pDeadline sp
         }
       client = contractClient scholarship
-  void $ mapError' $ runStep client $ ContractRedeemer {refund = False}
+  void $ mapError' $ runStepWith (mintingPolicy $ VerifiedByToken.policy $ sCourseProvider scholarship) mempty client $ ContractRedeemer {refund = False}
   logInfo @String "Initialized Personal Scholarship (using own money?)"
 
 refundScholarship :: ScholarshipParams -> Contract () s Text ()
@@ -193,7 +178,9 @@ refundScholarship sp = do
   let scholarship = Scholarship 
         { sAuthority        = pAuthority sp
         , sAuthoritySym     = pAuthoritySym sp
+        , sSchool           = pSchool sp 
         , sSchoolSym        = pSchoolSym sp
+        , sCourseProvider   = pCourseProvider sp 
         , sCourseProviderSym= pCourseProviderSym sp
         , sAmount           = pAmount sp
         , sMilestones       = pMilestones sp
@@ -215,5 +202,4 @@ endpoints = awaitPromise (init `select` progress `select` refund) >> endpoints
     init  = endpoint @"init" initScholarship
     progress = endpoint @"progress" completeMilestone
     refund = endpoint @"refund" refundScholarship
-
 
