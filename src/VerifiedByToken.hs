@@ -7,9 +7,10 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
+
 {-# OPTIONS_GHC -fno-ignore-interface-pragmas #-}
 
-module AdmissionToken where
+module VerifiedByToken where
 
 import           Ledger                 hiding (mint, singleton)
 import qualified Ledger.Typed.Scripts   as Scripts
