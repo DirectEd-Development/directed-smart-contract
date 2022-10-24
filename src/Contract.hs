@@ -48,7 +48,7 @@ data Scholarship = Scholarship
 
 PlutusTx.makeLift ''Scholarship
 
-newtype ContractRedeemer = ContractRedeemer {refund :: Bool} -- The only redeemer used is the one which says if the transaction is asking to refund a scholarship with a missed deadline.
+data ContractRedeemer = ContractRedeemer {refund :: Bool, emergencyRefund :: Bool} -- The redeemer is used only for refunding. refund can be used once the deadline has passed, and emergencyRefund can be used at any point.
 PlutusTx.unstableMakeIsData ''ContractRedeemer
 
 type Milestone = Integer
@@ -67,21 +67,30 @@ lovelaces = Ada.getLovelace . Ada.fromValue
 {-# INLINABLE transition #-}
 transition :: Scholarship -> State ContractDatum -> ContractRedeemer -> Maybe (TxConstraints Void Void, State ContractDatum)
 transition scholarship State {stateData,stateValue} contractRedeemer = case (stateData, stateValue, contractRedeemer) of
-  (_, _, ContractRedeemer True)                 -> Just ( Constraints.mustBeSignedBy (sAuthority scholarship) 
-                                                        , State stateData mempty ) --"Is this DirectEd asking for the refund? In futue version, also ask if it is passed the deadline?"
+  (ContractDatum pkh _, _, ContractRedeemer _ True)     -> Just ( Constraints.mustBeSignedBy (sAuthority scholarship) 
+                                                                , State (ContractDatum pkh $ sMilestones scholarship) mempty ) --"Is this DirectEd asking for the emergencyrefund?"
+                                                                                                          --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done (shouldn't really do this).
 
-  (ContractDatum pkh milestone, v, ContractRedeemer False)
-    | milestone < sMilestones scholarship       -> Just ( Constraints.mustBeSignedBy pkh           <>
-                                                          Constraints.mustMintValue (singleton (sCourseProviderSym scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) (-1)) --TokenName should later include milestone number?
-                                                          , State (ContractDatum pkh $ milestone+1) (v - lovelaceValueOf (divide (sAmount scholarship) $ sMilestones scholarship)))
+  (ContractDatum pkh _, _, ContractRedeemer True False)     -> Just ( Constraints.mustBeSignedBy (sAuthority scholarship) 
+                                                                    <>Constraints.mustValidateIn (Ledger.from $ sDeadline scholarship)
+                                                                    , State (ContractDatum pkh $ sMilestones scholarship) mempty ) --"Is this DirectEd asking for the refund? Have we passed the deadline?"
+                                                                                                          --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done (shouldn't really do this).
+
+  (ContractDatum pkh milestone, v, ContractRedeemer False False)
+    | milestone < sMilestones scholarship       -> Just ( Constraints.mustBeSignedBy pkh           
+                                                        <>Constraints.mustMintValue (singleton (sCourseProviderSym scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) (-1)) --TokenName should later include milestone number!
+                                                        <>Constraints.mustValidateIn (Ledger.to $ sDeadline scholarship)
+                                                        , State (ContractDatum pkh $ milestone+1) (v - lovelaceValueOf (divide (sAmount scholarship) $ sMilestones scholarship)))
   --"Signed by pkh, burns milestone token, and next state has Amount/Milestones less value and milestone+1"
   --Note that this assumes the format of the MilestoneToken's TokenName just a pkh
 
-  (ContractDatum pkh milestone, _, ContractRedeemer False)
+  (ContractDatum pkh milestone, _, ContractRedeemer False False)
     | milestone == sMilestones scholarship      -> Just ( Constraints.mustBeSignedBy pkh
-                                                          , State (ContractDatum pkh $ milestone+1) mempty ) --"Signed by pkh and next state has empty value" To finish the scholarship.
+                                                        <>Constraints.mustValidateIn (Ledger.to $ sDeadline scholarship)
+                                                        , State (ContractDatum pkh $ milestone+1) mempty ) 
+  --"Signed by pkh and next state has empty value" To finish the scholarship.
 
-  _                                             -> Nothing
+  _                                              -> Nothing
 
 {-# INLINABLE final #-}
 final :: Scholarship -> ContractDatum -> Bool
@@ -157,6 +166,7 @@ initScholarship sp = do
 
 completeMilestone :: ScholarshipParams -> Contract () s Text ()
 completeMilestone sp = do
+  time <- Contract.currentTime
   let scholarship = Scholarship 
         { sAuthority        = pAuthority sp
         , sAuthoritySym     = pAuthoritySym sp
@@ -169,12 +179,17 @@ completeMilestone sp = do
         , sDeadline         = pDeadline sp
         }
       client = contractClient scholarship
-  void $ mapError' $ runStepWith (mintingPolicy $ VerifiedByToken.policy $ sCourseProvider scholarship) mempty client $ ContractRedeemer {refund = False}
-  logInfo @String "Initialized Personal Scholarship (using own money?)"
+  if time <= sDeadline scholarship
+          then do
+            void $ mapError' $ runStepWith (mintingPolicy $ VerifiedByToken.policy $ sCourseProvider scholarship) mempty client $ ContractRedeemer {refund = False, emergencyRefund = False}
+            logInfo @String "Burned token and withdrew money" 
+          else do
+            logInfo @String "Deadline has passed"
 
 refundScholarship :: ScholarshipParams -> Contract () s Text ()
 refundScholarship sp = do
   pkh <- Contract.ownPaymentPubKeyHash
+  time <- Contract.currentTime
   let scholarship = Scholarship 
         { sAuthority        = pAuthority sp
         , sAuthoritySym     = pAuthoritySym sp
@@ -188,9 +203,13 @@ refundScholarship sp = do
         }
       client = contractClient scholarship
   if pkh == sAuthority scholarship 
-    then do 
-        void $ mapError' $ runStep client $ ContractRedeemer {refund = True}
-        logInfo @String "Refunded Scholarship to Authority" 
+    then do
+        if time >= sDeadline scholarship
+          then do
+            void $ mapError' $ runStep client $ ContractRedeemer {refund = False, emergencyRefund = True}
+            logInfo @String "Refunded Scholarship to Authority" 
+          else do
+            logInfo @String "Deadline not passed"
     else do
         logInfo @String "Not authority for scholarship"
 
