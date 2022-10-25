@@ -31,8 +31,13 @@ import           Prelude                (Show (..),Semigroup (..), String)
 import qualified Prelude
 import Data.Text (Text, pack)
 import Plutus.Contract as Contract
-import Control.Monad (void)
+import Control.Monad (void, unless)
 import qualified VerifiedByToken
+import qualified Plutus.Contract.StateMachine.OnChain as SM
+import Plutus.Contract.StateMachine.ThreadToken (curPolicy)
+import Control.Lens (review)
+import Plutus.Contract.Request (mkTxContract)
+import Ledger.Constraints.OffChain(UnbalancedTx)
 
 data Scholarship = Scholarship
     { sAuthority        :: !PaymentPubKeyHash
@@ -164,6 +169,54 @@ initScholarship sp = do
   void $ mapError' $ runInitialise client (ContractDatum (pRecipient sp) 0) v 
   logInfo @String "Initialized A Scholarship (using own money)"
 
+initScholarshipManual :: ScholarshipParams -> Contract () s Text ()
+initScholarshipManual sp = do
+  let scholarship = Scholarship 
+        { sAuthority        = pAuthority sp
+        , sAuthoritySym     = pAuthoritySym sp
+        , sSchool           = pSchool sp 
+        , sSchoolSym        = pSchoolSym sp
+        , sCourseProvider   = pCourseProvider sp
+        , sCourseProviderSym= pCourseProviderSym sp
+        , sAmount           = pAmount sp
+        , sMilestones       = pMilestones sp
+        , sDeadline         = pDeadline sp
+        }
+      v = lovelaceValueOf $ sAmount scholarship
+      client = contractClient scholarship
+  void $ mapError' $ runInitialiseNoTT client (ContractDatum (pRecipient sp) 0) v 
+  logInfo @String "Initialized A Scholarship (using own money)"
+
+-- | Initialise a state machine and supply additional constraints and lookups for transaction.(Edited from source)
+runInitialiseNoTT ::
+    forall w e state schema input.
+    ( PlutusTx.FromData state
+    , PlutusTx.ToData state
+    , PlutusTx.ToData input
+    , AsSMContractError e
+    )
+    => StateMachineClient state input
+    -- ^ The state machine
+    -> state
+    -- ^ The initial state
+    -> Value
+    -- ^ The value locked by the contract at the beginning
+    -> Contract w schema e state
+runInitialiseNoTT StateMachineClient{scInstance} initialState initialValue = mapError (review _SMContractError) $ do
+    ownPK <- Contract.ownPaymentPubKeyHash
+    utxo <- utxosAt (Ledger.pubKeyHashAddress ownPK Nothing)
+    let StateMachineInstance{stateMachine, typedValidator} = scInstance
+        constraints = mustPayToTheScript initialState initialValue
+        lookups = Constraints.typedValidatorLookups typedValidator
+            <> Constraints.unspentOutputs utxo
+    utx <- mapError (review _ConstraintResolutionContractError) (mkTxContract lookups constraints)
+    let adjustedUtx = Constraints.adjustUnbalancedTx utx
+    -- unless (utx == adjustedUtx) $
+    --   logWarn @Text $ "Plutus.Contract.StateMachine.runInitialise: "
+    --                 <> "Found a transaction output value with less than the minimum amount of Ada. Adjusting ..."
+    submitTxConfirmed adjustedUtx
+    pure initialState
+
 completeMilestone :: ScholarshipParams -> Contract () s Text ()
 completeMilestone sp = do
   time <- Contract.currentTime
@@ -213,12 +266,13 @@ refundScholarship sp = do
     else do
         logInfo @String "Not authority for scholarship"
 
-type ContractSchema = Endpoint "init" ScholarshipParams .\/ Endpoint "progress" ScholarshipParams .\/ Endpoint "refund" ScholarshipParams
+type ContractSchema = Endpoint "init" ScholarshipParams .\/ Endpoint "initManual" ScholarshipParams .\/ Endpoint "progress" ScholarshipParams .\/ Endpoint "refund" ScholarshipParams
 
 endpoints :: Contract () ContractSchema Text ()
-endpoints = awaitPromise (init `select` progress `select` refund) >> endpoints
+endpoints = awaitPromise (init `select` initManual `select` progress `select` refund) >> endpoints
   where
     init  = endpoint @"init" initScholarship
+    initManual = endpoint @"initManual" initScholarshipManual
     progress = endpoint @"progress" completeMilestone
     refund = endpoint @"refund" refundScholarship
 
