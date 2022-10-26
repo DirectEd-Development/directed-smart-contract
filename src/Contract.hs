@@ -35,6 +35,7 @@ import Control.Monad (void)
 import qualified VerifiedByToken
 import Control.Lens (review)
 import Plutus.Contract.Request (mkTxContract)
+import Ledger.Typed.Scripts (TypedValidator)
 
 data Scholarship = Scholarship
     { sAuthority        :: !PaymentPubKeyHash
@@ -180,8 +181,7 @@ initScholarshipManual sp = do
         , sDeadline         = pDeadline sp
         }
       v = lovelaceValueOf $ sAmount scholarship
-      client = contractClient scholarship
-  void $ mapError' $ runInitialiseNoTT client (ContractDatum (pRecipient sp) 0) v 
+  void $ mapError' $ runInitialiseNoTT (typedContractValidator scholarship) (ContractDatum (pRecipient sp) 0) v 
   logInfo @String "Initialized A Scholarship (using own money)"
 
 -- | Initialise a state machine and supply additional constraints and lookups for transaction.(Edited from source)
@@ -192,18 +192,17 @@ runInitialiseNoTT ::
     , PlutusTx.ToData input
     , AsSMContractError e
     )
-    => StateMachineClient state input
-    -- ^ The state machine
+    => TypedValidator (StateMachine state input)
+    -- ^ The state machine typed validator script
     -> state
     -- ^ The initial state
     -> Value
     -- ^ The value locked by the contract at the beginning
     -> Contract w schema e state
-runInitialiseNoTT StateMachineClient{scInstance} initialState initialValue = mapError (review _SMContractError) $ do
+runInitialiseNoTT typedValidator initialState initialValue = mapError (review _SMContractError) $ do
     ownPK <- Contract.ownPaymentPubKeyHash
     utxo <- utxosAt (Ledger.pubKeyHashAddress ownPK Nothing)
-    let StateMachineInstance{typedValidator} = scInstance
-        constraints = mustPayToTheScript initialState initialValue
+    let constraints = mustPayToTheScript initialState initialValue
         lookups = Constraints.typedValidatorLookups typedValidator
             <> Constraints.unspentOutputs utxo
     utx <- mapError (review _ConstraintResolutionContractError) (mkTxContract lookups constraints)

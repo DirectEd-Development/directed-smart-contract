@@ -69,9 +69,7 @@ refundTrace :: EmulatorTrace ()
 refundTrace = do 
 
     let (w1,w2,w3) = (knownWallet 1,knownWallet 2,knownWallet 3)
-    h1 <- activateContractWallet w1 endpoints
     h2 <- activateContractWallet w2 endpoints
-    h3t <- activateContractWallet w3 VerifiedByToken.endpoints
     let pkh1      = mockWalletPaymentPubKeyHash w1
         pkh2      = mockWalletPaymentPubKeyHash w2 
         pkh3      = mockWalletPaymentPubKeyHash w3
