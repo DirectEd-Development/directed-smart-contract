@@ -31,13 +31,10 @@ import           Prelude                (Show (..),Semigroup (..), String)
 import qualified Prelude
 import Data.Text (Text, pack)
 import Plutus.Contract as Contract
-import Control.Monad (void, unless)
+import Control.Monad (void)
 import qualified VerifiedByToken
-import qualified Plutus.Contract.StateMachine.OnChain as SM
-import Plutus.Contract.StateMachine.ThreadToken (curPolicy)
 import Control.Lens (review)
 import Plutus.Contract.Request (mkTxContract)
-import Ledger.Constraints.OffChain(UnbalancedTx)
 
 data Scholarship = Scholarship
     { sAuthority        :: !PaymentPubKeyHash
@@ -205,7 +202,7 @@ runInitialiseNoTT ::
 runInitialiseNoTT StateMachineClient{scInstance} initialState initialValue = mapError (review _SMContractError) $ do
     ownPK <- Contract.ownPaymentPubKeyHash
     utxo <- utxosAt (Ledger.pubKeyHashAddress ownPK Nothing)
-    let StateMachineInstance{stateMachine, typedValidator} = scInstance
+    let StateMachineInstance{typedValidator} = scInstance
         constraints = mustPayToTheScript initialState initialValue
         lookups = Constraints.typedValidatorLookups typedValidator
             <> Constraints.unspentOutputs utxo
