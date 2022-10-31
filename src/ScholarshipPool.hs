@@ -79,11 +79,12 @@ mkPoolValidator schol sValHash pkh _ ctx = traceIfFalse "doesn't consume accepta
         referencesStudentToken = True -- TODO
         outputsAtScholScript = scriptOutputsAt sValHash txInfo -- The outputs at the scholarship script.
 
-        -- correctDatumHash = findDatumHash (PlutusTx.toData $ Contract.ContractDatum pkh 0) 
-            --This part seems tricky. HOW TO convert from ContractDatum to Datum??? See BuiltinData section of documentation.
-        createsCorrectScholarship = True --TODO
-        -- | outputsAtScholScript == [(Contract.ContractDatum pkh 0,Ada.lovelaceValueOf $ Contract.sAmount schol)] = True
-        -- | otherwise = False
+        maybeCorrectDatumHash = findDatumHash ( Datum $ PlutusTx.toBuiltinData $ ScholarshipDatum pkh 0) txInfo 
+        -- The expected datum hash, if it is included in txInfoData in a pair of Datum, DatumHash.
+        createsCorrectScholarship = case maybeCorrectDatumHash of 
+          Nothing -> False
+          Just dh -> outputsAtScholScript == [(dh,Ada.lovelaceValueOf $ sAmount schol)] 
+          -- There should be exactly one output at the scholarship script, with the expected datum and value.
 
         scriptInputs = getScriptInputs ctx
         continuingOutputs = getContinuingOutputs ctx --We shall demand exactly 1 continuing Output. (Exactly 1 to avoid the Adjust problem , mandating that there are always 2 total outputs and ensuring they always contain at least minAda from within script)
@@ -130,6 +131,7 @@ initScholarship scholarship pkhRecipient = do
     ownUtxos <- utxosAt $ pubKeyHashAddress pkhOwn Nothing
     let acceptanceToken = Value.singleton (sAuthoritySym scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkhRecipient)) 1
     return () --TODO
+
 
 -- | Initialise a state machine with no thread token, using a specified set of possible input utxos. 
 -- Have to deconstruct and add to initScholarship....
