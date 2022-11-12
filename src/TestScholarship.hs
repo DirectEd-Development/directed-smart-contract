@@ -105,7 +105,7 @@ twoStudentsBasicTrace = do
 
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"progress" h1 (ScholarshipDatum pkh1 0)  -- Recipient provides evidence of progress and recieves portion of scholarship.
+    callEndpoint @"progress" h1 (ScholarshipDatum pkh1 0)  -- Recipient 1 provides evidence of progress and recieves portion of scholarship.
 
     void $ Emulator.waitNSlots 3
 

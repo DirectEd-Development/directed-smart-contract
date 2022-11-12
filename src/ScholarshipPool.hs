@@ -26,24 +26,9 @@ import qualified    Ledger.Typed.Scripts    as Scripts
 import PlutusTx.Prelude                     hiding (Semigroup(..), unless)
 import Ledger.Contexts                      as Contexts
 import Ledger.Value                         as Value
-import qualified Plutus.V1.Ledger.Ada as Ada
 import Plutus.Contract                      as Contract
 import Data.Text                            (Text)
-import Plutus.Contract.StateMachine (AsSMContractError, StateMachine)
-import Ledger.Typed.Scripts (TypedValidator)
-import Ledger.Constraints                   as Constraints
-import Control.Lens (review)
-import Plutus.Contract.Request (mkTxContract)
-import Prelude                (Semigroup (..))
-
-
-
-import Plutus.Contract.StateMachine
-
 import           Ledger.Ada             as Ada hiding (divide)
-import Data.Map (Map)
-import Control.Monad (void)
-
 
 
 --Student can consume Acceptance NFT and reference Student Status NFT to create an instance 
@@ -69,7 +54,8 @@ mkPoolValidator :: Scholarship -> Ledger.ValidatorHash -> PaymentPubKeyHash -> (
 mkPoolValidator schol sValHash pkh _ ctx = traceIfFalse "doesn't consume acceptance token" consumesAcceptaceToken
                                             && traceIfFalse "doesn't reference student status token" referencesStudentToken
                                             && traceIfFalse "doesn't create correct scholarship" createsCorrectScholarship
-                                            && traceIfFalse "doesn't withdraw correct amount" withdrawCorrectAmount
+                                            && traceIfFalse "should create exactly two outputs, the second returning excess ADA to the scholarshipPool script" returnsExcessToScript
+
     where
         txInfo = scriptContextTxInfo ctx
         valueMinted = txInfoMint txInfo
@@ -79,18 +65,27 @@ mkPoolValidator schol sValHash pkh _ ctx = traceIfFalse "doesn't consume accepta
         referencesStudentToken = True -- TODO
         outputsAtScholScript = scriptOutputsAt sValHash txInfo -- The outputs at the scholarship script.
 
-        maybeCorrectDatumHash = findDatumHash ( Datum $ PlutusTx.toBuiltinData $ ScholarshipDatum pkh 0) txInfo 
+        maybeCorrectDatumHash = findDatumHash ( Datum $ PlutusTx.toBuiltinData $ ScholarshipDatum pkh 0) txInfo
         -- The expected datum hash, if it is included in txInfoData in a pair of Datum, DatumHash.
-        createsCorrectScholarship = case maybeCorrectDatumHash of 
+
+        createsCorrectScholarship = case maybeCorrectDatumHash of
           Nothing -> False
-          Just dh -> outputsAtScholScript == [(dh,Ada.lovelaceValueOf $ sAmount schol)] 
+          Just dh -> outputsAtScholScript == [(dh,Ada.lovelaceValueOf $ sAmount schol)]
           -- There should be exactly one output at the scholarship script, with the expected datum and value.
 
-        scriptInputs = getScriptInputs ctx
-        continuingOutputs = getContinuingOutputs ctx --We shall demand exactly 1 continuing Output. (Exactly 1 to avoid the Adjust problem , mandating that there are always 2 total outputs and ensuring they always contain at least minAda from within script)
-        valueDeposited = foldMap txOutValue continuingOutputs
-        adaDeposited = Ada.fromValue valueDeposited
-        withdrawCorrectAmount = True --TODO
+        continuingOutputs = getContinuingOutputs ctx 
+        allOutputs = txInfoOutputs txInfo
+
+        returnsExcessToScript = case allOutputs of
+          [to1, to2] -> case continuingOutputs of
+            [returnTx] -> (returnTx == to1 || returnTx == to2) && isJust (txOutDatum returnTx)
+            _ -> False
+          _ -> False
+        -- Here we demand that there are a total of two outputs, and that one of them returns to the script.
+        -- Since we checked earlier that there is an output which creates the correct scholarship, the return output is
+        -- the only other output, which means that any excess money withdrawn must be returned to the script. 
+        -- Note that we also check that the return output has a datum, to ensure that it is spendable.
+
 
 data Pool
 instance Scripts.ValidatorTypes Pool where
@@ -127,7 +122,7 @@ initScholarship :: Scholarship -> PaymentPubKeyHash -> Contract () s Text ()
 initScholarship scholarship pkhRecipient = do
     let v = lovelaceValueOf $ sAmount scholarship
     utxos <- utxosAt $ scholarshipScrAddress scholarship
-    pkhOwn <- Contract.ownPaymentPubKeyHash 
+    pkhOwn <- Contract.ownPaymentPubKeyHash
     ownUtxos <- utxosAt $ pubKeyHashAddress pkhOwn Nothing
     let acceptanceToken = Value.singleton (sAuthoritySym scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkhRecipient)) 1
     return () --TODO
