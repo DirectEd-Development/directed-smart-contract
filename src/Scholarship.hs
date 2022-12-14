@@ -147,19 +147,6 @@ scholarshipClient scholarship datum = StateMachineClient (StateMachineInstance (
 mapError' :: Contract w s SMContractError a -> Contract w s Text a
 mapError' = mapError $ pack . show
 
-data ScholarshipParams = ScholarshipParams
-    { pRecipient        :: !PaymentPubKeyHash
-    , pAuthority        :: !PaymentPubKeyHash
-    , pAuthoritySym     :: !CurrencySymbol
-    , pSchool           :: !PaymentPubKeyHash
-    , pSchoolSym        :: !CurrencySymbol
-    , pCourseProvider   :: !PaymentPubKeyHash
-    , pCourseProviderSym:: !CurrencySymbol
-    , pAmount           :: !Integer
-    , pMilestones       :: !Integer
-    , pDeadline         :: !POSIXTime
-    } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq)
-
 initScholarshipOwnMoney :: Scholarship -> PaymentPubKeyHash -> Contract () s Text ()
 initScholarshipOwnMoney scholarship pkhRecipient = do
   let client = scholarshipClient scholarship 
