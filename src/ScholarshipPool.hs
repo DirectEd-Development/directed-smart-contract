@@ -183,16 +183,15 @@ dropUntilList p (x:xs)
 -- Return excess Ada withdrawn to the pool
 -- Provide 'evidence' - in this case, consumed tokens and referenced tokens - to satisfy the pool script.
 initScholarship :: PoolParams -> PaymentPubKeyHash -> Contract () s Text ()
-initScholarship pool pkhRecipient = do
-    pkhOwn <- Contract.ownPaymentPubKeyHash
+initScholarship pool pkhRecipient = do   
     let schol           = scholarshipFromParams pool
         scholValue      = lovelaceValueOf $ sAmount schol
         acceptanceToken = Value.singleton (sAuthoritySym schol) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkhRecipient)) 1
         scholScriptHash = scholarshipValHash schol
         poolScript      = typedPoolValidator schol
+        poolVal         = poolValidator schol
         initialState    = ScholarshipDatum pkhRecipient 0
 
-    ownUtxos <- utxosAt $ pubKeyHashAddress pkhOwn Nothing
     utxos <- utxosAt $ poolScrAddress schol
     --We grab utxos from here until we are above scholValue+minAda. Then we use those to fund this transaction.
     let utxoList = Data.Map.toList utxos
@@ -205,13 +204,14 @@ initScholarship pool pkhRecipient = do
     --                <> mconcat [ Constraints.mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData pkhRecipient | (oref,_) <- utxosToUse]
 
     let constraints = Constraints.mustPayToOtherScript scholScriptHash (Datum $ toBuiltinData initialState) scholValue
-                   <> Constraints.mustPayToTheScript () (lovelaceValueOf 45000000 - scholValue)
+                   <> Constraints.mustPayToTheScript () (valueToUse - scholValue)
                    <> Constraints.mustMintValue (negate acceptanceToken)
                    <> mconcat [ Constraints.mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData pkhRecipient | (oref,_) <- utxoList]
 
         lookups = Constraints.mintingPolicy (VerifiedByToken.policy $ sAuthority schol)
             <> Constraints.unspentOutputs utxos
             <> Constraints.typedValidatorLookups poolScript
+            <> Constraints.otherScript poolVal
 
     --We then build and submit the transaction based on the above constraints.
     utx <- mapError (review _ConstraintResolutionContractError) (mkTxContract lookups constraints)

@@ -70,13 +70,13 @@ basicTrace = do
 
     void $ Emulator.waitNSlots 3
 
-    -- callEndpoint @"mint" h3t (2,pkh1) -- Courseprovider mints 2 milestone completion tokens and sends to recipient.
+    callEndpoint @"mint" h3t (2,pkh1) -- Courseprovider mints 2 milestone completion tokens and sends to recipient.
 
-    -- void $ Emulator.waitNSlots 3
+    void $ Emulator.waitNSlots 3
 
-    -- callEndpoint @"progress" h1 (ScholarshipDatum pkh1 0)  -- Recipient provides evidence of progress and recieves portion of scholarship.
+    callEndpoint @"progress" h1 (ScholarshipDatum pkh1 0)  -- Recipient provides evidence of progress and recieves portion of scholarship.
 
-    -- void $ Emulator.waitNSlots 3
+    void $ Emulator.waitNSlots 3
 
 twoStudentsBasicTest :: IO ()
 twoStudentsBasicTest = runEmulatorTraceIO twoStudentsBasicTrace
