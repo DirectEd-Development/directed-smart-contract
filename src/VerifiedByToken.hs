@@ -33,7 +33,7 @@ import Data.Maybe (fromJust)
 {-# INLINABLE mkPolicy #-}
 mkPolicy :: PaymentPubKeyHash -> () -> ScriptContext -> Bool
 mkPolicy authPkh () ctx = case flattenValue $ txInfoMint txInfo of
-                            [(curSym,tn,n)]                                                          --We specifically demand that there is exactly one token being minted/burned so that we know it is the one from this script. Not sure how else to determine which token comes from this script? 
+                            [(curSym,tn,n)]                                                          --We specifically demand that if any tokens are being minted, there is only a single token being minted/burned. Otherwise not sure how to determine which currencySymbol belongs to this script!
                               | n < 0 -> True --Burning is allowed.    
                               | n > 0 -> traceIfFalse "not signed by authority" signedByAuthority &&
                                           traceIfFalse "must send to specified pkh" sentToNamedWallet --Assumes the tokenName is exactly a pkh, and that the pkh corresponds to the address the token was sent to.                         
@@ -43,7 +43,10 @@ mkPolicy authPkh () ctx = case flattenValue $ txInfoMint txInfo of
                                 maybePkhReciever = find (\txOut -> valueOf (txOutValue txOut) curSym tn > 0) txOuts >>= toPubKeyHash . txOutAddress
                                 sentToNamedWallet = maybe False ((==) (unTokenName tn) . getPubKeyHash) maybePkhReciever
 
-                            _         -> traceIfFalse "Must mint/burn exactly one type of token" False
+                            mintingList
+                                | and $ (\(_,_,c)->c<0) <$> mintingList  -> True -- Burning everything is allowed.
+                                | otherwise -> traceIfFalse "must either burn multiple types of tokens, or mint a single type of token" False
+
   where
     txInfo = scriptContextTxInfo ctx
 

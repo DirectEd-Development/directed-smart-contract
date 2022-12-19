@@ -26,23 +26,24 @@ basicTest :: IO ()
 basicTest = runEmulatorTraceIO basicTrace
 
 basicTrace :: EmulatorTrace ()
-basicTrace = do 
-    let (w1,w2,w3,w4) = (knownWallet 1,knownWallet 2,knownWallet 3,knownWallet 4)
+basicTrace = do
+    let (w1,w2,w3,w4,w5) = (knownWallet 1,knownWallet 2,knownWallet 3,knownWallet 4,knownWallet 5)
     let pkh1      = mockWalletPaymentPubKeyHash w1 --Recipient
         pkh2      = mockWalletPaymentPubKeyHash w2 --Authority
         pkh3      = mockWalletPaymentPubKeyHash w3 --School
-        pkh4      = mockWalletPaymentPubKeyHash w4 --Donor
+        pkh4      = mockWalletPaymentPubKeyHash w4 --Course Provider     
+        pkh5      = mockWalletPaymentPubKeyHash w5 --Donor
         amount    = 40_000_000
         milestones= 2
-        deadline  = slotToEndPOSIXTime def 20
+        deadline  = slotToEndPOSIXTime def 40
 
         scholarship = Scholarship
-            { sAuthority        = pkh2 
-            , sAuthoritySym     = VerifiedByToken.curSymbol pkh2 
+            { sAuthority        = pkh2
+            , sAuthoritySym     = VerifiedByToken.curSymbol pkh2
             , sSchool           = pkh3
-            , sSchoolSym        = VerifiedByToken.curSymbol pkh3 -- Unused
-            , sCourseProvider   = pkh3
-            , sCourseProviderSym= VerifiedByToken.curSymbol pkh3
+            , sSchoolSym        = VerifiedByToken.curSymbol pkh3
+            , sCourseProvider   = pkh4
+            , sCourseProviderSym= VerifiedByToken.curSymbol pkh4
             , sAmount           = amount
             , sMilestones       = milestones
             , sDeadline         = deadline
@@ -52,13 +53,14 @@ basicTrace = do
     h1p <- activateContractWallet w1 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
     h2t <- activateContractWallet w2 VerifiedByToken.endpoints
     h3t <- activateContractWallet w3 VerifiedByToken.endpoints
-    h4p <- activateContractWallet w4 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
-    
-    callEndpoint @"donate" h4p 10_000_000 --First donation
+    h4t <- activateContractWallet w4 VerifiedByToken.endpoints
+    h5p <- activateContractWallet w5 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
+
+    callEndpoint @"donate" h5p 50_000_000 --First donation
 
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"donate" h4p 35_000_000 --Second Donation
+    callEndpoint @"donate" h5p 35_000_000 --Second Donation
 
     void $ Emulator.waitNSlots 3
 
@@ -66,11 +68,15 @@ basicTrace = do
 
     void $ Emulator.waitNSlots 3
 
+    callEndpoint @"mint" h3t (1,pkh1) -- School mints 1 school token and sends to recipient.
+
+    void $ Emulator.waitNSlots 3
+
     callEndpoint @"initScholarship" h1p pkh1 -- Recipient initiates personal scholarship
 
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"mint" h3t (2,pkh1) -- Courseprovider mints 2 milestone completion tokens and sends to recipient.
+    callEndpoint @"mint" h4t (2,pkh1) -- Courseprovider mints 2 milestone completion tokens and sends to recipient.
 
     void $ Emulator.waitNSlots 3
 
@@ -82,80 +88,157 @@ twoStudentsBasicTest :: IO ()
 twoStudentsBasicTest = runEmulatorTraceIO twoStudentsBasicTrace
 
 twoStudentsBasicTrace :: EmulatorTrace ()
-twoStudentsBasicTrace = do 
-    let (w1,w2,w3,w4) = (knownWallet 1,knownWallet 2,knownWallet 3,knownWallet 4)
-    let pkh1      = mockWalletPaymentPubKeyHash w1 --Student 1
+twoStudentsBasicTrace = do
+    let (w1,w2,w3,w4,w5,w6) = (knownWallet 1,knownWallet 2,knownWallet 3,knownWallet 4,knownWallet 5,knownWallet 6)
+    let pkh1      = mockWalletPaymentPubKeyHash w1 --Recipient
         pkh2      = mockWalletPaymentPubKeyHash w2 --Authority
-        pkh3      = mockWalletPaymentPubKeyHash w3 --CourseProvider
-        pkh4      = mockWalletPaymentPubKeyHash w4 --Student 2
+        pkh3      = mockWalletPaymentPubKeyHash w3 --School
+        pkh4      = mockWalletPaymentPubKeyHash w4 --Course Provider     
+        pkh5      = mockWalletPaymentPubKeyHash w5 --Donor
+        pkh6      = mockWalletPaymentPubKeyHash w6 --Recipient 2
         amount    = 40_000_000
         milestones= 2
-        deadline  = slotToEndPOSIXTime def 20
+        deadline  = slotToEndPOSIXTime def 40
 
         scholarship = Scholarship
-            { sAuthority        = pkh2 
-            , sAuthoritySym     = VerifiedByToken.curSymbol pkh2 
+            { sAuthority        = pkh2
+            , sAuthoritySym     = VerifiedByToken.curSymbol pkh2
             , sSchool           = pkh3
-            , sSchoolSym        = VerifiedByToken.curSymbol pkh3 -- Unused
-            , sCourseProvider   = pkh3
-            , sCourseProviderSym= VerifiedByToken.curSymbol pkh3
+            , sSchoolSym        = VerifiedByToken.curSymbol pkh3
+            , sCourseProvider   = pkh4
+            , sCourseProviderSym= VerifiedByToken.curSymbol pkh4
             , sAmount           = amount
             , sMilestones       = milestones
             , sDeadline         = deadline
             }
 
     h1 <- activateContractWallet w1 $ endpoints scholarship
-    h2 <- activateContractWallet w2 $ endpoints scholarship
+    h1p <- activateContractWallet w1 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
+    h2t <- activateContractWallet w2 VerifiedByToken.endpoints
     h3t <- activateContractWallet w3 VerifiedByToken.endpoints
-    h4 <- activateContractWallet w4 $ endpoints scholarship
-        
-    callEndpoint @"init" h2 pkh1 -- Authority Initiates Scholarship for Recipient 1 (pkh1)
+    h4t <- activateContractWallet w4 VerifiedByToken.endpoints
+    h5p <- activateContractWallet w5 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
+    h6 <- activateContractWallet w6 $ endpoints scholarship
+    h6p <- activateContractWallet w6 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
+
+    callEndpoint @"donate" h5p 50_000_000 --First donation
 
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"init" h2 pkh4 -- Authority Initiates Scholarship for Recipient 2 (pkh4)
+    callEndpoint @"donate" h5p 35_000_000 --Second Donation
 
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"mint" h3t (2,pkh1) -- Courseprovider mints 2 milestone completion tokens and sends to recipient.
+    callEndpoint @"mint" h2t (1,pkh1) -- Authority mints 1 acceptance token and sends to recipient.
 
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"progress" h1 (ScholarshipDatum pkh1 0)  -- Recipient 1 provides evidence of progress and recieves portion of scholarship.
+    callEndpoint @"mint" h3t (1,pkh1) -- School mints 1 school token and sends to recipient.
 
     void $ Emulator.waitNSlots 3
+
+    callEndpoint @"mint" h2t (1,pkh6) -- Authority mints 1 acceptance token and sends to recipient 2.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"mint" h3t (1,pkh6) -- School mints 1 school token and sends to recipient 2.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"initScholarship" h1p pkh1 -- Recipient initiates personal scholarship
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"initScholarship" h6p pkh6 -- Recipient 2 initiates personal scholarship
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"mint" h4t (2,pkh1) -- Courseprovider mints 2 milestone completion tokens and sends to recipient.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"mint" h4t (2,pkh6) -- Courseprovider mints 2 milestone completion tokens and sends to recipient 2.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"progress" h1 (ScholarshipDatum pkh1 0)  -- Recipient provides evidence of progress and recieves portion of scholarship.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"progress" h6 (ScholarshipDatum pkh6 0)  -- Recipient 2 provides evidence of progress and recieves portion of scholarship.
+
+    void $ Emulator.waitNSlots 3
+
 
 refundTest :: IO ()
 refundTest = runEmulatorTraceIO refundTrace
 
 refundTrace :: EmulatorTrace ()
-refundTrace = do 
-
-    let (w1,w2,w3) = (knownWallet 1,knownWallet 2,knownWallet 3)
-    let pkh1      = mockWalletPaymentPubKeyHash w1
-        pkh2      = mockWalletPaymentPubKeyHash w2 
-        pkh3      = mockWalletPaymentPubKeyHash w3
+refundTrace = do
+    let (w1,w2,w3,w4,w5) = (knownWallet 1,knownWallet 2,knownWallet 3,knownWallet 4,knownWallet 5)
+    let pkh1      = mockWalletPaymentPubKeyHash w1 --Recipient
+        pkh2      = mockWalletPaymentPubKeyHash w2 --Authority
+        pkh3      = mockWalletPaymentPubKeyHash w3 --School
+        pkh4      = mockWalletPaymentPubKeyHash w4 --Course Provider     
+        pkh5      = mockWalletPaymentPubKeyHash w5 --Donor
         amount    = 40_000_000
         milestones= 2
         deadline  = slotToEndPOSIXTime def 20
 
         scholarship = Scholarship
-            { sAuthority        = pkh2 
-            , sAuthoritySym     = VerifiedByToken.curSymbol pkh2 
+            { sAuthority        = pkh2
+            , sAuthoritySym     = VerifiedByToken.curSymbol pkh2
             , sSchool           = pkh3
-            , sSchoolSym        = VerifiedByToken.curSymbol pkh3 -- Unused
-            , sCourseProvider   = pkh3
-            , sCourseProviderSym= VerifiedByToken.curSymbol pkh3
+            , sSchoolSym        = VerifiedByToken.curSymbol pkh3
+            , sCourseProvider   = pkh4
+            , sCourseProviderSym= VerifiedByToken.curSymbol pkh4
             , sAmount           = amount
             , sMilestones       = milestones
             , sDeadline         = deadline
             }
+
+    h1 <- activateContractWallet w1 $ endpoints scholarship
+    h1p <- activateContractWallet w1 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
     h2 <- activateContractWallet w2 $ endpoints scholarship
-       
-    callEndpoint @"init" h2 pkh1 -- Authority Initiates Scholarship for Recipient
+    h2t <- activateContractWallet w2 VerifiedByToken.endpoints
+    h2p <- activateContractWallet w2 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
+    h3t <- activateContractWallet w3 VerifiedByToken.endpoints
+    h4t <- activateContractWallet w4 VerifiedByToken.endpoints
+    h5p <- activateContractWallet w5 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
 
-    void $ Emulator.waitNSlots 20
-
-    callEndpoint @"refund" h2 (ScholarshipDatum pkh1 0)
+    callEndpoint @"donate" h5p 10_000_000 --First donation
 
     void $ Emulator.waitNSlots 3
+
+    callEndpoint @"donate" h5p 35_000_000 --Second Donation
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"mint" h2t (1,pkh1) -- Authority mints 1 acceptance token and sends to recipient.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"mint" h3t (1,pkh1) -- School mints 1 school token and sends to recipient.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"initScholarship" h1p pkh1 -- Recipient initiates personal scholarship
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"mint" h4t (2,pkh1) -- Courseprovider mints 2 milestone completion tokens and sends to recipient.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"progress" h1 (ScholarshipDatum pkh1 0)  -- Recipient provides evidence of progress and recieves portion of scholarship.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"emergencyRefund" h2 (ScholarshipDatum pkh1 1) -- Authority asks for an emergency refund of the specific scholarship.
+
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"refundPool" h2p pkh2 -- Authority asks for a refund of the scholarshippool.
+
+    void $ Emulator.waitNSlots 3
+

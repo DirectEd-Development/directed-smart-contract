@@ -67,23 +67,21 @@ lovelaces = Ada.getLovelace . Ada.fromValue
 
 --How do we set this up so that we can accept donations and then pool them into one scholarship?
 --A: We have two contracts. One for collection of money, and one for the individual scholarships. The collection one must contain the rules for how the individual scholarships are initiated.
---      -For now, we take this approach. In theory this could be combined into one SC if we don't use the StateMachine module, but instead build our own, where the first step of pooling money into a contract isn't tracked by a token.
---How do we set this up so that the fees for minting are paid by the scholarship? (Point for later, don't worry right now)
 {-# INLINABLE transition #-}
 transition :: Scholarship -> State ScholarshipDatum -> ScholarshipRedeemer -> Maybe (TxConstraints Void Void, State ScholarshipDatum)
 transition scholarship State {stateData,stateValue} sRedeemer = case (stateData, stateValue, sRedeemer) of
   (ScholarshipDatum pkh _, _, ScholarshipRedeemer _ True)     -> Just ( Constraints.mustBeSignedBy (sAuthority scholarship)
-                                                                , State (ScholarshipDatum pkh $ sMilestones scholarship) mempty ) --"Is this DirectEd asking for the emergencyrefund?"
-                                                                                                          --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done (shouldn't really do this).
+                                                                , State (ScholarshipDatum pkh $ 1 + sMilestones scholarship) mempty ) --"Is this DirectEd asking for the emergencyrefund?"
+                                                                                                          --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done.
 
   (ScholarshipDatum pkh _, _, ScholarshipRedeemer True False)     -> Just ( Constraints.mustBeSignedBy (sAuthority scholarship)
                                                                     <>Constraints.mustValidateIn (Ledger.from $ sDeadline scholarship)
-                                                                    , State (ScholarshipDatum pkh $ sMilestones scholarship) mempty ) --"Is this DirectEd asking for the refund? Have we passed the deadline?"
-                                                                                                          --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done (shouldn't really do this).
+                                                                    , State (ScholarshipDatum pkh $ 1 + sMilestones scholarship) mempty ) --"Is this DirectEd asking for the refund? Have we passed the deadline?"
+                                                                                                          --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done.
 
   (ScholarshipDatum pkh milestone, v, ScholarshipRedeemer False False)
     | milestone < sMilestones scholarship       -> Just ( Constraints.mustBeSignedBy pkh
-                                                        <>Constraints.mustMintValue (singleton (sCourseProviderSym scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) (-1)) --TokenName should later include milestone number!
+                                                        <>Constraints.mustMintValue (singleton (sCourseProviderSym scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) (-1))
                                                         <>Constraints.mustValidateIn (Ledger.to $ sDeadline scholarship)
                                                         , State (ScholarshipDatum pkh $ milestone+1) (v - lovelaceValueOf (divide (sAmount scholarship) $ sMilestones scholarship)))
   --"Signed by pkh, burns milestone token, and next state has Amount/Milestones less value and milestone+1"
@@ -99,7 +97,7 @@ transition scholarship State {stateData,stateValue} sRedeemer = case (stateData,
 
 {-# INLINABLE final #-}
 final :: Scholarship -> ScholarshipDatum -> Bool
-final scholarship (ScholarshipDatum _ milestone) = sMilestones scholarship == milestone
+final scholarship (ScholarshipDatum _ milestone) = sMilestones scholarship <= milestone
 
 {-# INLINABLE scholarshipStateMachine #-}
 scholarshipStateMachine :: Scholarship -> StateMachine ScholarshipDatum ScholarshipRedeemer
@@ -165,8 +163,8 @@ completeMilestone scholarship expectedDatum = do
           else do
             logInfo @String "Deadline has passed"
 
-refundScholarship :: Scholarship -> ScholarshipDatum -> Contract () s Text ()
-refundScholarship scholarship expectedDatum = do
+emergencyRefundScholarship :: Scholarship -> ScholarshipDatum -> Contract () s Text ()
+emergencyRefundScholarship scholarship expectedDatum = do
   pkh <- Contract.ownPaymentPubKeyHash
   time <- Contract.currentTime
   let client = scholarshipClient scholarship
@@ -184,11 +182,11 @@ refundScholarship scholarship expectedDatum = do
 type ScholarshipSchema =  Endpoint "init" PaymentPubKeyHash
                       .\/ Endpoint "initManual" PaymentPubKeyHash
                       .\/ Endpoint "progress" ScholarshipDatum
-                      .\/ Endpoint "refund" ScholarshipDatum
+                      .\/ Endpoint "emergencyRefund" ScholarshipDatum
 
 endpoints :: Scholarship -> Contract () ScholarshipSchema Text ()
 endpoints scholarship = awaitPromise (init `select` progress `select` refund) >> endpoints scholarship
   where
     init  = endpoint @"init" $ initScholarshipOwnMoney scholarship
     progress = endpoint @"progress" $ completeMilestone scholarship
-    refund = endpoint @"refund" $ refundScholarship scholarship
+    refund = endpoint @"emergencyRefund" $ emergencyRefundScholarship scholarship

@@ -44,7 +44,7 @@ import Ledger.Constraints
 
 
 
---Student can consume Acceptance NFT and reference Student Status NFT to create an instance 
+-- Student can consume Acceptance NFT and Student Status NFT to create an instance 
 -- of the state machine which is their personal scholarship fund.
 
 -- Q: What information is fixed in the contract? Contract.Scholarship
@@ -60,14 +60,18 @@ getScriptInputs :: ScriptContext -> [TxInInfo]
 getScriptInputs ctx
     | Just TxInInfo{txInInfoResolved=TxOut{txOutAddress}} <- findOwnInput ctx =
     filter (\txInInfo -> Contexts.txOutAddress (Contexts.txInInfoResolved txInInfo) == txOutAddress) (txInfoInputs $ scriptContextTxInfo ctx)
-    | Nothing <- findOwnInput ctx = [] --This case should be impossible.
+    | Nothing <- findOwnInput ctx = [] --Note this case should be impossible.
 
 {-# INLINABLE mkPoolValidator #-}
 mkPoolValidator :: Scholarship -> Ledger.ValidatorHash -> () -> PaymentPubKeyHash -> ScriptContext -> Bool
-mkPoolValidator schol sValHash _ pkh ctx = traceIfFalse "doesn't consume acceptance token" consumesAcceptaceToken
-                                            && traceIfFalse "doesn't reference student status token" referencesStudentToken
+mkPoolValidator schol sValHash _ pkh ctx = isRefund ||
+                                            (traceIfFalse "doesn't consume acceptance token" consumesAcceptaceToken
+                                            && traceIfFalse "doesn't consume student status token" consumesStudentToken
                                             && traceIfFalse "doesn't create correct scholarship" createsCorrectScholarship
-                                            && traceIfFalse "should return excess ADA to the pool script" returnsExcessToScript
+                                            && traceIfFalse "should return excess ADA to the pool script" returnsExcessToScript)
+
+
+
 
     where
         txInfo = scriptContextTxInfo ctx
@@ -75,9 +79,11 @@ mkPoolValidator schol sValHash _ pkh ctx = traceIfFalse "doesn't consume accepta
         consumesAcceptaceToken = valueOf valueMinted (sAuthoritySym schol)
                                 (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) == (-1)
 
-        referencesStudentToken = True -- TODO
+        consumesStudentToken = valueOf valueMinted (sSchoolSym schol)
+                                (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) == (-1)
 
-        outputsAtScholScript = scriptOutputsAt sValHash txInfo -- The outputs at the scholarship script.
+        outputsAtScholScript = scriptOutputsAt sValHash txInfo
+        -- The outputs at the scholarship script.
 
         maybeCorrectDatumHash = findDatumHash ( Datum $ PlutusTx.toBuiltinData $ ScholarshipDatum pkh 0) txInfo
         -- The expected datum hash, if it is included in txInfoData in a pair of Datum, DatumHash.
@@ -98,8 +104,14 @@ mkPoolValidator schol sValHash _ pkh ctx = traceIfFalse "doesn't consume accepta
         withdrawUpToLimit = adaWithdrew - adaDeposited <= Ada.fromInteger (sAmount schol) :: Bool
         --We must also check that ada re-deposited has isJust datum (to ensure it is spendable from the script)
         contOutputsHaveDatum = all (isJust . txOutDatum) continuingOutputs
-        returnsExcessToScript = withdrawUpToLimit && contOutputsHaveDatum
 
+        --The following two options seems to result in different accepted transactions?
+        returnsExcessToScript = withdrawUpToLimit && contOutputsHaveDatum
+        -- returnsExcessToScript = traceIfFalse "doesn't withdrawUpToLimit" withdrawUpToLimit && traceIfFalse "continuing outputs don't have datum" contOutputsHaveDatum
+
+        --If the supplied pkh (in the redeemer) is that of the authority, then this is the authority requesting a full refund in the event of a bug.
+        --In this case the transaction must also be signed by that pkh. 
+        isRefund = (pkh == sAuthority schol) && elem pkh (fmap PaymentPubKeyHash (txInfoSignatories txInfo))
 
 
 data Pool
@@ -150,10 +162,8 @@ scholarshipFromParams pool =
     , sAuthoritySym     = VerifiedByToken.curSymbol $ pAuthority pool
     , sSchool           = pSchool pool
     , sSchoolSym        = VerifiedByToken.curSymbol $ pSchool pool
-    --MUST BE CHANGED when we have seperate schoolToken
     , sCourseProvider   = pCourseProvider pool
     , sCourseProviderSym= VerifiedByToken.curSymbol $ pCourseProvider pool
-    --MUST BE CHANGED when we have seperate milestoneToken
     , sAmount           = pAmount pool
     , sMilestones       = pMilestones pool
     , sDeadline         = pDeadline pool
@@ -170,45 +180,44 @@ poolParamsToScholarship schol =
     , pDeadline         = sDeadline schol
     }
 
---Drops elements from a list until dropping one more would cause the predicate to be true. Assumes predicate is false on whole list.
+--Utility function that drops elements from a list until dropping one more would cause the predicate to be true. Assumes predicate is false on whole list.
+--We will use this function in our off-chain code to select the script UTXOs to spend when creating a scholarship.
 dropUntilList :: ([a] -> Bool) -> [a] -> [a]
 dropUntilList _ [] = []
 dropUntilList p (x:xs)
     | p xs = x:xs
     | otherwise = dropUntilList p xs
 
---This should:
--- Pick utxos from the pool enough to make a scholarship and send back minScriptAda. (There is theory about how to pick?)
--- Use these to initialize the correct scholarship.
+--To initialize a scholarship, we do the following:
+-- Pick utxos from the pool until we have enough ada to make a scholarship and send back 2 Ada. (Always sending back at least 2 Ada allows us to avoid the attempted construction of a transaction that sends back less than minAda to the script)
+-- Use these utxos to initialize the correct scholarship in the scholarship script.
 -- Return excess Ada withdrawn to the pool
--- Provide 'evidence' - in this case, consumed tokens and referenced tokens - to satisfy the pool script.
+-- Provide 'evidence' - in this case, consuming an acceptanceToken and a schoolToken - to satisfy the pool script.
 initScholarship :: PoolParams -> PaymentPubKeyHash -> Contract () s Text ()
-initScholarship pool pkhRecipient = do   
+initScholarship pool pkhRecipient = do
     let schol           = scholarshipFromParams pool
         scholValue      = lovelaceValueOf $ sAmount schol
         acceptanceToken = Value.singleton (sAuthoritySym schol) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkhRecipient)) 1
+        schoolToken     = Value.singleton (sSchoolSym schol) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkhRecipient)) 1
         scholScriptHash = scholarshipValHash schol
         poolScript      = typedPoolValidator schol
         poolVal         = poolValidator schol
         initialState    = ScholarshipDatum pkhRecipient 0
 
     utxos <- utxosAt $ poolScrAddress schol
-    --We grab utxos from here until we are above scholValue+minAda. Then we use those to fund this transaction.
+
     let utxoList = Data.Map.toList utxos
         utxosToUse = dropUntilList (\list -> leq (sum (txOutValue . toTxOut . snd <$> list)) (scholValue + lovelaceValueOf 2_000_000)) utxoList
         valueToUse = sum (txOutValue . toTxOut . snd <$> utxosToUse)
 
-    -- let constraints = Constraints.mustPayToOtherScript scholScriptHash (Datum $ toBuiltinData initialState) scholValue
-    --                <> Constraints.mustPayToTheScript () (valueToUse - scholValue)
-    --                <> Constraints.mustMintValue (negate acceptanceToken)
-    --                <> mconcat [ Constraints.mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData pkhRecipient | (oref,_) <- utxosToUse]
-
     let constraints = Constraints.mustPayToOtherScript scholScriptHash (Datum $ toBuiltinData initialState) scholValue
                    <> Constraints.mustPayToTheScript () (valueToUse - scholValue)
                    <> Constraints.mustMintValue (negate acceptanceToken)
+                   <> Constraints.mustMintValue (negate schoolToken)
                    <> mconcat [ Constraints.mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData pkhRecipient | (oref,_) <- utxoList]
 
         lookups = Constraints.mintingPolicy (VerifiedByToken.policy $ sAuthority schol)
+            <> Constraints.mintingPolicy (VerifiedByToken.policy $ sSchool schol)
             <> Constraints.unspentOutputs utxos
             <> Constraints.typedValidatorLookups poolScript
             <> Constraints.otherScript poolVal
@@ -221,6 +230,7 @@ initScholarship pool pkhRecipient = do
     --                 <> "Found a transaction output value with less than the minimum amount of Ada. Adjusting ..."
     submitTxConfirmed adjustedUtx
 
+--This can only be successfully run by the authority.
 refundPool :: PoolParams -> PaymentPubKeyHash -> Contract () s Text ()
 refundPool pool _ = do
     pkhOwn <- Contract.ownPaymentPubKeyHash
@@ -241,7 +251,6 @@ donate pool amount = do
     ownUtxos <- utxosAt $ pubKeyHashAddress pkhOwn Nothing
     let schol = scholarshipFromParams pool
         poolHash = poolValHash schol
-
 
     let constraints = Constraints.mustPayToOtherScript poolHash (Datum $ PlutusTx.toBuiltinData ()) (Ada.lovelaceValueOf amount)
     let lookups = Constraints.unspentOutputs ownUtxos :: ScriptLookups Pool
