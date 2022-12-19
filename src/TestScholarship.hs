@@ -183,7 +183,7 @@ refundTrace = do
         pkh5      = mockWalletPaymentPubKeyHash w5 --Donor
         amount    = 40_000_000
         milestones= 2
-        deadline  = slotToEndPOSIXTime def 20
+        deadline  = slotToEndPOSIXTime def 40
 
         scholarship = Scholarship
             { sAuthority        = pkh2
@@ -206,7 +206,7 @@ refundTrace = do
     h4t <- activateContractWallet w4 VerifiedByToken.endpoints
     h5p <- activateContractWallet w5 $ ScholarshipPool.poolEndpoints (ScholarshipPool.poolParamsToScholarship scholarship)
 
-    callEndpoint @"donate" h5p 10_000_000 --First donation
+    callEndpoint @"donate" h5p 50_000_000 --First donation
 
     void $ Emulator.waitNSlots 3
 
@@ -239,6 +239,8 @@ refundTrace = do
     void $ Emulator.waitNSlots 3
 
     callEndpoint @"refundPool" h2p pkh2 -- Authority asks for a refund of the scholarshippool.
+    --The above currently causes an error because it tries to refund a utxo that was already spent in the previous steps. This is
+    -- a wallet modelling error rather than a smart contract error.
 
     void $ Emulator.waitNSlots 3
 

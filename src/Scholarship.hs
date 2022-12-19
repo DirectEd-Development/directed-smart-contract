@@ -166,16 +166,11 @@ completeMilestone scholarship expectedDatum = do
 emergencyRefundScholarship :: Scholarship -> ScholarshipDatum -> Contract () s Text ()
 emergencyRefundScholarship scholarship expectedDatum = do
   pkh <- Contract.ownPaymentPubKeyHash
-  time <- Contract.currentTime
   let client = scholarshipClient scholarship
   if pkh == sAuthority scholarship
-    then do
-        if time >= sDeadline scholarship
-          then do
-            void $ mapError' $ runStep (client expectedDatum) $ ScholarshipRedeemer {refund = False, emergencyRefund = True}
-            logInfo @String "Refunded Scholarship to Authority"
-          else do
-            logInfo @String "Deadline not passed"
+      then do
+        void $ mapError' $ runStep (client expectedDatum) $ ScholarshipRedeemer {refund = False, emergencyRefund = True}
+        logInfo @String "Refunded Scholarship to Authority"
     else do
         logInfo @String "Not authority for scholarship"
 

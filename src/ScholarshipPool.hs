@@ -105,9 +105,7 @@ mkPoolValidator schol sValHash _ pkh ctx = isRefund ||
         --We must also check that ada re-deposited has isJust datum (to ensure it is spendable from the script)
         contOutputsHaveDatum = all (isJust . txOutDatum) continuingOutputs
 
-        --The following two options seems to result in different accepted transactions?
-        returnsExcessToScript = withdrawUpToLimit && contOutputsHaveDatum
-        -- returnsExcessToScript = traceIfFalse "doesn't withdrawUpToLimit" withdrawUpToLimit && traceIfFalse "continuing outputs don't have datum" contOutputsHaveDatum
+        returnsExcessToScript = traceIfFalse "doesn't withdrawUpToLimit" withdrawUpToLimit && traceIfFalse "continuing outputs don't have datum" contOutputsHaveDatum
 
         --If the supplied pkh (in the redeemer) is that of the authority, then this is the authority requesting a full refund in the event of a bug.
         --In this case the transaction must also be signed by that pkh. 
@@ -236,7 +234,7 @@ refundPool pool _ = do
     pkhOwn <- Contract.ownPaymentPubKeyHash
     let schol = scholarshipFromParams pool
         poolScript = typedPoolValidator schol
-    utxos <- utxosAt $ scholarshipScrAddress schol
+    utxos <- utxosAt $ poolScrAddress schol
     let utxoList = Data.Map.toList utxos
     let constraints = mconcat [ Constraints.mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData pkhOwn | (oref,_) <- utxoList]
     let lookups = Constraints.typedValidatorLookups poolScript
