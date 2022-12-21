@@ -33,9 +33,6 @@ import Data.Text (Text, pack)
 import Plutus.Contract as Contract
 import Control.Monad (void)
 import qualified VerifiedByToken
-import Control.Lens (review)
-import Plutus.Contract.Request (mkTxContract)
-import Ledger.Typed.Scripts (TypedValidator)
 import Ledger.Typed.Tx (TypedScriptTxOut(tyTxOutData))
 
 data Scholarship = Scholarship
@@ -129,16 +126,15 @@ scholarshipValHash = Scripts.validatorHash . typedScholarshipValidator
 scholarshipScrAddress ::  Scholarship -> Ledger.Address
 scholarshipScrAddress = scriptAddress . scholarshipValidator
 
---Need to manually implement non-default scChooser in case of multiple of the same contract (although that can come later, as long as it comes!)
+--Need to manually implement non-default scChooser in case of multiple UTXOs at the scholarship script.
 --We do this by allowing the user to specify the datum they are looking for: the pkh reciever and milestone they believe it should be on.
---We pick the first utxo with the correct datum. 
+--We pick the first utxo with the correct datum, since the datum completely specifies the scholarship state. 
 scholarshipChooser :: ScholarshipDatum -> [OnChainState ScholarshipDatum ScholarshipRedeemer] -> Either SMContractError (OnChainState ScholarshipDatum ScholarshipRedeemer)
 scholarshipChooser datum states 
   = pickFound $ find (\state -> tyTxOutData (ocsTxOut state) Prelude.== datum) states
   where pickFound Nothing = Left $ ChooserError "No scholarships found with specified datum"
         pickFound (Just state) = Right state
 
---The problem with such an scChooser is that the Contract monad must recalculate the client every time it wants to be used.
 scholarshipClient :: Scholarship -> ScholarshipDatum -> StateMachineClient ScholarshipDatum ScholarshipRedeemer
 scholarshipClient scholarship datum = StateMachineClient (StateMachineInstance (scholarshipStateMachine scholarship) (typedScholarshipValidator scholarship)) $ scholarshipChooser datum
 

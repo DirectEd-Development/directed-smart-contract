@@ -29,17 +29,17 @@ import           Wallet.Emulator.Wallet
 import Data.Maybe (fromJust)
 
 
---This minting policy requires that the transaction is signed by the minting authority, and that the token is sent to the pkh specified in the tokenName. Burning is always allowed.
+--This minting policy requires that the transaction is signed by the minting institution, and that the token is sent to the pkh specified in the tokenName. Burning is always allowed.
 {-# INLINABLE mkPolicy #-}
 mkPolicy :: PaymentPubKeyHash -> () -> ScriptContext -> Bool
-mkPolicy authPkh () ctx = case flattenValue $ txInfoMint txInfo of
+mkPolicy instPkh () ctx = case flattenValue $ txInfoMint txInfo of
                             [(curSym,tn,n)]                                                          --We specifically demand that if any tokens are being minted, there is only a single token being minted/burned. Otherwise not sure how to determine which currencySymbol belongs to this script!
                               | n < 0 -> True --Burning is allowed.    
-                              | n > 0 -> traceIfFalse "not signed by authority" signedByAuthority &&
+                              | n > 0 -> traceIfFalse "not signed by institution" signedByInstitution &&
                                           traceIfFalse "must send to specified pkh" sentToNamedWallet --Assumes the tokenName is exactly a pkh, and that the pkh corresponds to the address the token was sent to.                         
                               where
                                 txOuts = txInfoOutputs txInfo
-                                signedByAuthority = txSignedBy txInfo (unPaymentPubKeyHash authPkh)
+                                signedByInstitution = txSignedBy txInfo (unPaymentPubKeyHash instPkh)
                                 maybePkhReciever = find (\txOut -> valueOf (txOutValue txOut) curSym tn > 0) txOuts >>= toPubKeyHash . txOutAddress
                                 sentToNamedWallet = maybe False ((==) (unTokenName tn) . getPubKeyHash) maybePkhReciever
 
@@ -64,7 +64,7 @@ curSymbol = scriptCurrencySymbol . policy
 type TokenSchema = Endpoint "mint" (Integer, PaymentPubKeyHash)
                    .\/ Endpoint "burn" (Integer, PaymentPubKeyHash)
 
---As the minting authority, mint tokens and send them to the specified reciever's pkh.
+--As the minting institution, mint tokens and send them to the specified reciever's pkh.
 mint :: (Integer,PaymentPubKeyHash) -> Contract w TokenSchema Text ()
 mint (n,pkhReciever) = do
     pkh <- Contract.ownPaymentPubKeyHash
@@ -76,13 +76,13 @@ mint (n,pkhReciever) = do
     void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
     Contract.logInfo @String $ printf "minted %s" (show val)
 
---As a token reciever, burn tokens created by the specified minting authority's pkh.
+--As a token reciever, burn tokens created by the specified minting institution's pkh.
 burn :: (Integer, PaymentPubKeyHash) -> Contract w TokenSchema Text ()
-burn (n, pkhAuthority) = do
+burn (n, pkhInstitution) = do
     pkh <- Contract.ownPaymentPubKeyHash
     let tn = TokenName $  getPubKeyHash . unPaymentPubKeyHash $ pkh
-        val = singleton (curSymbol pkhAuthority) tn (- n)
-        lookups = Constraints.mintingPolicy $ policy pkhAuthority
+        val = singleton (curSymbol pkhInstitution) tn (- n)
+        lookups = Constraints.mintingPolicy $ policy pkhInstitution
         tx = Constraints.mustMintValue val
     ledgerTx <- submitTxConstraintsWith @Void lookups tx
     void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
@@ -113,7 +113,7 @@ endpoints = awaitPromise (mint' `select` burn') >> endpoints
 
 test :: IO ()
 test = runEmulatorTraceIO $ do
-  let w1 = knownWallet 1 --Authority Wallet
+  let w1 = knownWallet 1 --Institution Wallet
   let w2 = knownWallet 2 --Reciever Wallet
   let w1State = emptyWalletState w1
   let pkh1 = PaymentPubKeyHash $ fromJust (w1State >>= toPubKeyHash . ownAddress)
