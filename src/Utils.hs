@@ -17,6 +17,7 @@ module Utils
     , constructScholarship
     , writePolicies
     , writeFreePolicy
+    , writeDatum
     ) where
 
 import           Cardano.Api                 as API
@@ -79,7 +80,6 @@ tryReadAddress x = case deserialiseAddress AsAddressAny $ pack x of
 tryReadWalletId :: String -> Maybe WalletId
 tryReadWalletId = decode . encode
 
-
 unsafeReadWalletId :: String -> WalletId
 unsafeReadWalletId s = fromMaybe (error $ "can't parse " ++ s ++ " as a WalletId") $ tryReadWalletId s
 
@@ -102,6 +102,8 @@ writeJSON file = LBS.writeFile file . encode . scriptDataToJson ScriptDataJsonDe
 writeUnit :: IO ()
 writeUnit = writeJSON "testnet/unit.json" ()
 
+writeDatum :: FilePath -> String -> Scholarship.Milestone -> IO () 
+writeDatum filepath addressString milestone = writeJSON filepath $ Scholarship.ScholarshipDatum (unsafePaymentPubKeyHash $ unsafeReadAddress addressString) milestone
 
 getCredentials :: Plutus.Address -> Maybe (Plutus.PaymentPubKeyHash, Maybe Plutus.StakePubKeyHash)
 getCredentials (Plutus.Address x y) = case x of
@@ -161,13 +163,6 @@ constructScholarship auth school courseProvider amount milestones deadline =
       , pMilestones     = milestones            --For now 2
       , pDeadline       = Plutus.POSIXTime deadline --UNUSED
       }
-
-writeAcceptancePolicy :: FilePath -> Scholarship.Scholarship -> IO (Either (FileError ()) ())
-writeAcceptancePolicy filePath scholarship = writeMintingPolicy filePath $ VerifiedByToken.policy (Scholarship.sAuthority scholarship) 
-
-writeMilestonePolicy :: FilePath -> Scholarship.Scholarship -> IO (Either (FileError ()) ())
-writeMilestonePolicy filePath scholarship = writeMintingPolicy filePath $ VerifiedByToken.policy (Scholarship.sCourseProvider scholarship) 
-
 writePoolValidator :: FilePath -> Scholarship.Scholarship -> IO (Either (FileError ()) ())
 writePoolValidator filePath scholarship = 
   writeScriptValidator filePath $ ScholarshipPool.poolValidator scholarship
@@ -175,6 +170,12 @@ writePoolValidator filePath scholarship =
 writeScholarshipValidator :: FilePath -> Scholarship.Scholarship -> IO (Either (FileError ()) ())
 writeScholarshipValidator filePath scholarship = 
   writeScriptValidator filePath $ Scholarship.scholarshipValidator scholarship
+
+writeAcceptancePolicy :: FilePath -> Scholarship.Scholarship -> IO (Either (FileError ()) ())
+writeAcceptancePolicy filePath scholarship = writeMintingPolicy filePath $ VerifiedByToken.policy (Scholarship.sAuthority scholarship) 
+
+writeMilestonePolicy :: FilePath -> Scholarship.Scholarship -> IO (Either (FileError ()) ())
+writeMilestonePolicy filePath scholarship = writeMintingPolicy filePath $ VerifiedByToken.policy (Scholarship.sCourseProvider scholarship) 
 
 writePolicies :: FilePath -> FilePath -> FilePath -> FilePath -> Scholarship.Scholarship -> IO (Either (FileError ()) ())
 writePolicies poolPath scholPath acceptanceTokenPath milesTokenPath scholarship = do
