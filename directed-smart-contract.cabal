@@ -65,11 +65,11 @@ library
       lens -any,
 
 -- This is the first executable file that will get called from the cabal exec command, and will be the main :: IO () files for our project 
-executable writeDatum
+executable writeScholDatum
 -- Include this to import the ghc-options and language above 
   import: lang
 -- This is the file name token-policy.hs, one of the executable files 
-  main-is: writeDatum.hs
+  main-is: writeScholDatum.hs
 -- This is the local directory location of token-policy.hs 
   hs-source-dirs: app
 -- Always include this
@@ -82,6 +82,86 @@ executable writeDatum
     directed-smart-contract,
 --These are unclear if needed:
 --ALSO, SEEMS LIKE SOMETHING HERE SERIOUSLY MESSED UP THE NIX-SHELL Building? Or maybe not?  
+    data-default -any,
+    plutus-contract -any,
+    plutus-pab -any,
+    aeson -any,
+    freer-simple -any,
+    prettyprinter -any,
+    freer-extras -any,
+    plutus-ledger -any,
+    openapi3 -any,
+    cardano-api,
+
+executable tokenName
+  import: lang
+  main-is: tokenName.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    base >= 4.9 && < 5,
+    directed-smart-contract,
+    data-default -any,
+    plutus-contract -any,
+    plutus-pab -any,
+    aeson -any,
+    freer-simple -any,
+    prettyprinter -any,
+    freer-extras -any,
+    plutus-ledger -any,
+    openapi3 -any,
+    cardano-api,
+
+executable writeUnit
+  import: lang
+  main-is: writeUnit.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    base >= 4.9 && < 5,
+    directed-smart-contract,
+    data-default -any,
+    plutus-contract -any,
+    plutus-pab -any,
+    aeson -any,
+    freer-simple -any,
+    prettyprinter -any,
+    freer-extras -any,
+    plutus-ledger -any,
+    openapi3 -any,
+    cardano-api,
+
+executable writeScripts
+  import: lang
+  main-is: writeScripts.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    base >= 4.9 && < 5,
+    directed-smart-contract,
+    data-default -any,
+    plutus-contract -any,
+    plutus-pab -any,
+    aeson -any,
+    freer-simple -any,
+    prettyprinter -any,
+    freer-extras -any,
+    plutus-ledger -any,
+    openapi3 -any,
+    cardano-api,
+
+executable writeScholRedeemer
+  import: lang
+  main-is: writeScholRedeemer.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    base >= 4.9 && < 5,
+    directed-smart-contract,
     data-default -any,
     plutus-contract -any,
     plutus-pab -any,

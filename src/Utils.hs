@@ -18,6 +18,7 @@ module Utils
     , writePolicies
     , writeFreePolicy
     , writeDatum
+    , writeScholRedeemer
     ) where
 
 import           Cardano.Api                 as API
@@ -51,6 +52,7 @@ import qualified ScholarshipPool
 import qualified VerifiedByToken
 import ScholarshipPool (PoolParams(pAuthority, pSchool, pCourseProvider, pAmount, pMilestones, pDeadline))
 import qualified TestFreeToken
+import Scholarship (ScholarshipRedeemer(emergencyRefund, ScholarshipRedeemer, refund))
 
 dataToScriptData :: Data -> ScriptData
 dataToScriptData (Constr n xs) = ScriptDataConstructor n $ dataToScriptData <$> xs
@@ -99,11 +101,15 @@ unsafeReadTxOutRef s =
 writeJSON :: PlutusTx.ToData a => FilePath -> a -> IO ()
 writeJSON file = LBS.writeFile file . encode . scriptDataToJson ScriptDataJsonDetailedSchema . dataToScriptData . PlutusTx.toData
 
-writeUnit :: IO ()
-writeUnit = writeJSON "testnet/unit.json" ()
+writeUnit :: FilePath -> IO ()
+writeUnit file = writeJSON file ()
 
 writeDatum :: FilePath -> String -> Scholarship.Milestone -> IO () 
 writeDatum filepath addressString milestone = writeJSON filepath $ Scholarship.ScholarshipDatum (unsafePaymentPubKeyHash $ unsafeReadAddress addressString) milestone
+
+writeScholRedeemer :: FilePath -> String -> String -> IO () 
+writeScholRedeemer filepath refundString emergencyRefundString = writeJSON filepath $ ScholarshipRedeemer {refund = read refundString, emergencyRefund = read emergencyRefundString}
+
 
 getCredentials :: Plutus.Address -> Maybe (Plutus.PaymentPubKeyHash, Maybe Plutus.StakePubKeyHash)
 getCredentials (Plutus.Address x y) = case x of

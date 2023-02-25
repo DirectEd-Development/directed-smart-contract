@@ -4,7 +4,6 @@ module Main
         
 import System.Environment   (getArgs)
 import Utils                (writeDatum)
-import           Cardano.Api                 as API
 
 main :: IO ()
 main = do
