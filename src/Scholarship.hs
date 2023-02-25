@@ -72,21 +72,21 @@ transition scholarship State {stateData,stateValue} sRedeemer = case (stateData,
                                                                                                           --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done.
 
   (ScholarshipDatum pkh _, _, ScholarshipRedeemer True False)     -> Just ( Constraints.mustBeSignedBy (sAuthority scholarship)
-                                                                    -- Deadline: <>Constraints.mustValidateIn (Ledger.from $ sDeadline scholarship)
+                                                                    <>Constraints.mustValidateIn (Ledger.from $ sDeadline scholarship)
                                                                     , State (ScholarshipDatum pkh $ 1 + sMilestones scholarship) mempty ) --"Is this DirectEd asking for the refund? Have we passed the deadline?"
                                                                                                           --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done.
 
   (ScholarshipDatum pkh milestone, v, ScholarshipRedeemer False False)
     | milestone < sMilestones scholarship       -> Just ( Constraints.mustBeSignedBy pkh
                                                         <>Constraints.mustMintValue (singleton (sCourseProviderSym scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) (-1))
-                                                        -- Deadline: <>Constraints.mustValidateIn (Ledger.to $ sDeadline scholarship)
+                                                        <>Constraints.mustValidateIn (Ledger.to $ sDeadline scholarship)
                                                         , State (ScholarshipDatum pkh $ milestone+1) (v - lovelaceValueOf (divide (sAmount scholarship) $ sMilestones scholarship)))
   --"Signed by pkh, burns milestone token, and next state has Amount/Milestones less value and milestone+1"
   --Note that this assumes the format of the MilestoneToken's TokenName just a pkh
 
   (ScholarshipDatum pkh milestone, _, ScholarshipRedeemer False False)
     | milestone == sMilestones scholarship      -> Just ( Constraints.mustBeSignedBy pkh
-                                                        -- Deadline: <>Constraints.mustValidateIn (Ledger.to $ sDeadline scholarship)
+                                                        <>Constraints.mustValidateIn (Ledger.to $ sDeadline scholarship)
                                                         , State (ScholarshipDatum pkh $ milestone+1) mempty )
   --"Signed by pkh and next state has empty value" To finish the scholarship.
 
