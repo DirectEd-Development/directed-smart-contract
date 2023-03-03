@@ -21,7 +21,6 @@ import Scholarship
 import qualified ScholarshipPool
 import qualified VerifiedByToken
 import Prelude (IO)
-import Wallet.Emulator.MultiAgent (EmulatorState)
 
 testStep1 :: IO ()
 testStep1 = runEmulatorTraceIO traceStep1
