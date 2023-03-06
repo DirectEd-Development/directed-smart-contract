@@ -31,9 +31,14 @@ import           Prelude                (Show (..),Semigroup (..), String)
 import qualified Prelude
 import Data.Text (Text, pack)
 import Plutus.Contract as Contract
-import Control.Monad (void)
+import Control.Monad (void, unless)
 import qualified VerifiedByToken
 import Ledger.Typed.Tx (TypedScriptTxOut(tyTxOutData))
+import qualified Ledger.Contexts as Contexts
+import Plutus.V1.Ledger.Api (ToData(toBuiltinData))
+import Wallet.Emulator.Wallet (ownOutputs)
+import Control.Lens (review)
+import Plutus.Contract.Request (mkTxContract)
 
 data Scholarship = Scholarship
     { sAuthority        :: !PaymentPubKeyHash
@@ -49,7 +54,7 @@ data Scholarship = Scholarship
 
 PlutusTx.makeLift ''Scholarship
 
-data ScholarshipRedeemer = ScholarshipRedeemer {refund :: Bool, emergencyRefund :: Bool} -- The redeemer is used only for refunding. refund can be used once the deadline has passed, and emergencyRefund can be used at any point.
+newtype ScholarshipRedeemer = ScholarshipRedeemer {refund :: Bool} -- The redeemer is used only for refunding. refund can be used once the deadline has passed, and emergencyRefund can be used at any point.
 PlutusTx.unstableMakeIsData ''ScholarshipRedeemer
 
 type Milestone = Integer
@@ -62,57 +67,53 @@ PlutusTx.unstableMakeIsData ''ScholarshipDatum
 lovelaces :: Ledger.Value -> Integer
 lovelaces = Ada.getLovelace . Ada.fromValue
 
---How do we set this up so that we can accept donations and then pool them into one scholarship?
---A: We have two contracts. One for collection of money, and one for the individual scholarships. The collection one must contain the rules for how the individual scholarships are initiated.
-{-# INLINABLE transition #-}
-transition :: Scholarship -> State ScholarshipDatum -> ScholarshipRedeemer -> Maybe (TxConstraints Void Void, State ScholarshipDatum)
-transition scholarship State {stateData,stateValue} sRedeemer = case (stateData, stateValue, sRedeemer) of
-  (ScholarshipDatum pkh _, _, ScholarshipRedeemer _ True)     -> Just ( Constraints.mustBeSignedBy (sAuthority scholarship)
-                                                                , State (ScholarshipDatum pkh $ 1 + sMilestones scholarship) mempty ) --"Is this DirectEd asking for the emergencyrefund?"
-                                                                                                          --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done.
-
-  (ScholarshipDatum pkh _, _, ScholarshipRedeemer True False)     -> Just ( Constraints.mustBeSignedBy (sAuthority scholarship)
-                                                                    <>Constraints.mustValidateIn (Ledger.from $ sDeadline scholarship)
-                                                                    , State (ScholarshipDatum pkh $ 1 + sMilestones scholarship) mempty ) --"Is this DirectEd asking for the refund? Have we passed the deadline?"
-                                                                                                          --Must ensure this passes the 'final' check so the statemachine is terminated. Hence changing milestones to done.
-
-  (ScholarshipDatum pkh milestone, v, ScholarshipRedeemer False False)
-    | milestone < sMilestones scholarship       -> Just ( Constraints.mustBeSignedBy pkh
-                                                        <>Constraints.mustMintValue (singleton (sCourseProviderSym scholarship) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkh)) (-1))
-                                                        <>Constraints.mustValidateIn (Ledger.to $ sDeadline scholarship)
-                                                        , State (ScholarshipDatum pkh $ milestone+1) (v - lovelaceValueOf (divide (sAmount scholarship) $ sMilestones scholarship)))
-  --"Signed by pkh, burns milestone token, and next state has Amount/Milestones less value and milestone+1"
-  --Note that this assumes the format of the MilestoneToken's TokenName just a pkh
-
-  (ScholarshipDatum pkh milestone, _, ScholarshipRedeemer False False)
-    | milestone == sMilestones scholarship      -> Just ( Constraints.mustBeSignedBy pkh
-                                                        <>Constraints.mustValidateIn (Ledger.to $ sDeadline scholarship)
-                                                        , State (ScholarshipDatum pkh $ milestone+1) mempty )
-  --"Signed by pkh and next state has empty value" To finish the scholarship.
-
-  _                                              -> Nothing
-
-{-# INLINABLE final #-}
-final :: Scholarship -> ScholarshipDatum -> Bool
-final scholarship (ScholarshipDatum _ milestone) = sMilestones scholarship <= milestone
-
-{-# INLINABLE scholarshipStateMachine #-}
-scholarshipStateMachine :: Scholarship -> StateMachine ScholarshipDatum ScholarshipRedeemer
-scholarshipStateMachine scholarship = mkStateMachine
-    Nothing
-    (transition scholarship)
-    (final scholarship)
-
+--The scholarship contract does the following:
+-- cases on sRedeemer (true -> mustbeSignedbyAuthority)
+-- false ->
+--     cases on milestone number (< milestones -> signed by pkh, burns a token, withinDeadline, creates correctnextState)
+--     (= milestones -> signedbyPkh, deadline)
+-- otherwise false
 {-# INLINABLE mkScholarshipValidator #-}
 mkScholarshipValidator :: Scholarship -> ScholarshipDatum -> ScholarshipRedeemer -> ScriptContext -> Bool
-mkScholarshipValidator scholarship = mkValidator $ scholarshipStateMachine scholarship
+mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = case sRedeemer of
+  (ScholarshipRedeemer True) -> traceIfFalse "Refund not signed by authority" $ txSignedBy txInfo (unPaymentPubKeyHash $ sAuthority schol) --If refunding, must be signed by Authority 
 
-type ScholarshipType = StateMachine ScholarshipDatum ScholarshipRedeemer
+  (ScholarshipRedeemer False)
+    | milestone < sMilestones schol -> traceIfFalse "Not signed by recipient" (txSignedBy txInfo (unPaymentPubKeyHash ppkh)) -- If completing intermediate milestone, must be signed by recipient, 
+                                    && traceIfFalse "Milestone token not burned" burnsMilestoneToken --must burn a single milestone token,
+                                    && traceIfFalse "Space here for a deadline requirement" True
+                                    && traceIfFalse "withdraws funding correctly" withdrawCorrect --Returns the remaining portion of scholarship to the script, with correct datum.
 
-typedScholarshipValidator :: Scholarship -> Scripts.TypedValidator ScholarshipType
-typedScholarshipValidator scholarship = Scripts.mkTypedValidator @ScholarshipType
+
+  (ScholarshipRedeemer False)
+    | milestone == sMilestones schol -> traceIfFalse "Not signed by recipient" (txSignedBy txInfo (unPaymentPubKeyHash ppkh)) -- If completing intermediate milestone, must be signed by recipient, 
+                                    && traceIfFalse "Milestone token not burned" burnsMilestoneToken --must burn a single milestone token,
+                                    && traceIfFalse "Space here for a deadline requirement" True
+
+  _ -> False
+  where
+    txInfo = scriptContextTxInfo ctx
+    valueMinted = txInfoMint txInfo :: Value
+    burnsMilestoneToken = valueOf valueMinted (sCourseProviderSym schol) (TokenName $ getPubKeyHash (unPaymentPubKeyHash ppkh)) == (-1)
+
+    scholInputValue = txOutValue . txInInfoResolved <$> findOwnInput ctx
+    scholOutputs = getContinuingOutputs ctx
+    correctDatum = ScholarshipDatum ppkh (milestone + 1)
+    withdrawCorrect = case (scholInputValue, scholOutputs) of
+      (Just v, [output]) -> traceIfFalse "incorrect datum" (Just (datumHash . Datum . toBuiltinData $ correctDatum) == txOutDatum output)  -- Note this requires there is only a single output, removing the possibility of students banding together to submit a single transaction.
+                         && traceIfFalse "incorrect value" (txOutValue output == (v - lovelaceValueOf (divide (sAmount schol) $ sMilestones schol)))
+
+      _ -> False
+
+data ScholTypes
+instance Scripts.ValidatorTypes ScholTypes where
+    type instance DatumType ScholTypes = ScholarshipDatum
+    type instance RedeemerType ScholTypes = ScholarshipRedeemer
+
+typedScholarshipValidator :: Scholarship -> Scripts.TypedValidator ScholTypes
+typedScholarshipValidator schol = Scripts.mkTypedValidator @ScholTypes
     ($$(PlutusTx.compile [|| mkScholarshipValidator ||])
-        `PlutusTx.applyCode` PlutusTx.liftCode scholarship)
+        `PlutusTx.applyCode` PlutusTx.liftCode schol)
     $$(PlutusTx.compile [|| wrap ||])
   where
     wrap = Scripts.wrapValidator @ScholarshipDatum @ScholarshipRedeemer
@@ -126,46 +127,70 @@ scholarshipValHash = Scripts.validatorHash . typedScholarshipValidator
 scholarshipScrAddress ::  Scholarship -> Ledger.Address
 scholarshipScrAddress = scriptAddress . scholarshipValidator
 
---Need to manually implement non-default scChooser in case of multiple UTXOs at the scholarship script.
---We do this by allowing the user to specify the datum they are looking for: the pkh reciever and milestone they believe it should be on.
---We pick the first utxo with the correct datum, since the datum completely specifies the scholarship state. 
-scholarshipChooser :: ScholarshipDatum -> [OnChainState ScholarshipDatum ScholarshipRedeemer] -> Either SMContractError (OnChainState ScholarshipDatum ScholarshipRedeemer)
-scholarshipChooser datum states 
-  = pickFound $ find (\state -> tyTxOutData (ocsTxOut state) Prelude.== datum) states
-  where pickFound Nothing = Left $ ChooserError "No scholarships found with specified datum"
-        pickFound (Just state) = Right state
-
-scholarshipClient :: Scholarship -> ScholarshipDatum -> StateMachineClient ScholarshipDatum ScholarshipRedeemer
-scholarshipClient scholarship datum = StateMachineClient (StateMachineInstance (scholarshipStateMachine scholarship) (typedScholarshipValidator scholarship)) $ scholarshipChooser datum
-
-mapError' :: Contract w s SMContractError a -> Contract w s Text a
-mapError' = mapError $ pack . show
 
 initScholarshipOwnMoney :: Scholarship -> PaymentPubKeyHash -> Contract () s Text ()
-initScholarshipOwnMoney scholarship pkhRecipient = do
-  let client = scholarshipClient scholarship 
-      v = lovelaceValueOf $ sAmount scholarship
-  void $ mapError' $ runInitialise (client (ScholarshipDatum pkhRecipient 0)) (ScholarshipDatum pkhRecipient 0) v --The datum included in client is meaningless here, since we do not search for a utxo
+initScholarshipOwnMoney schol pkhRecipient = do
+  pkhOwn <- Contract.ownPaymentPubKeyHash
+  ownUtxos <- utxosAt $ pubKeyHashAddress pkhOwn Nothing
+  let scholValue      = lovelaceValueOf $ sAmount schol
+      scholScriptHash = scholarshipValHash schol
+      initialState    = ScholarshipDatum pkhRecipient 0
+
+  let constraints = Constraints.mustPayToOtherScript scholScriptHash (Datum $ toBuiltinData initialState) scholValue
+      lookups = Constraints.unspentOutputs ownUtxos
+
+  --We then build and submit the transaction based on the above constraints.
+  utx <- mapError (review _ConstraintResolutionContractError) (mkTxContract @() lookups constraints)
+  let adjustedUtx = Constraints.adjustUnbalancedTx utx
+  -- unless (utx == adjustedUtx) $
+  --   logWarn @Text $ "Plutus.Contract.StateMachine.runInitialise: "
+  --                 <> "Found a transaction output value with less than the minimum amount of Ada. Adjusting ..."
+  submitTxConfirmed adjustedUtx
   logInfo @String "Initialized A Scholarship (using own money)"
 
 completeMilestone :: Scholarship -> ScholarshipDatum -> Contract () s Text ()
-completeMilestone scholarship expectedDatum = do
-  time <- Contract.currentTime
-  let client = scholarshipClient scholarship
-  if time <= sDeadline scholarship
-          then do
-            void $ mapError' $ runStepWith (mintingPolicy $ VerifiedByToken.policy $ sCourseProvider scholarship) mempty (client expectedDatum) $ ScholarshipRedeemer {refund = False, emergencyRefund = False}
-            logInfo @String "Burned token and withdrew money"
-          else do
-            logInfo @String "Deadline has passed"
+completeMilestone schol expectedDatum = do
+  let scholScriptHash = scholarshipValHash schol
+      scholTypedValidator = typedScholarshipValidator schol
+      (ScholarshipDatum pkhRecipient previousMilestone) = expectedDatum
+      milestoneToken     = Value.singleton (sCourseProviderSym schol) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkhRecipient)) 1
+      oref = _ --Pick one at scholarshipScript with expectedDatum and correct value. 
 
-emergencyRefundScholarship :: Scholarship -> ScholarshipDatum -> Contract () s Text ()
-emergencyRefundScholarship scholarship expectedDatum = do
+  let lookups           = Constraints.mintingPolicy (VerifiedByToken.policy $ sCourseProvider schol)
+                       <> Constraints.typedValidatorLookups scholTypedValidator
+      commonConstraints = Constraints.mustMintValue (negate milestoneToken)
+                       <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ ScholarshipRedeemer False)
+                       <> Constraints.mustBeSignedBy pkhRecipient
+
+  if previousMilestone < sMilestones schol
+      then let constraints = Constraints.mustPayToOtherScript scholScriptHash (Datum $ toBuiltinData (ScholarshipDatum pkhRecipient (previousMilestone + 1))) (lovelaceValueOf $ divide (sAmount schol) (sMilestones schol) * (sMilestones schol - (previousMilestone + 1)))
+                          <> commonConstraints
+      in do utx <- mapError (review _ConstraintResolutionContractError) (mkTxContract lookups constraints)
+            let adjustedUtx = Constraints.adjustUnbalancedTx utx
+            submitTxConfirmed adjustedUtx
+            logInfo @String "Burned token, withdrew next step of money"
+
+      else let constraints = commonConstraints
+      in do utx <- mapError (review _ConstraintResolutionContractError) (mkTxContract lookups constraints)
+            let adjustedUtx = Constraints.adjustUnbalancedTx utx
+            submitTxConfirmed adjustedUtx
+            logInfo @String "Burned token, withdrew rest of money"
+
+refundScholarship :: Scholarship -> ScholarshipDatum -> Contract () s Text ()
+refundScholarship schol expectedDatum = do
   pkh <- Contract.ownPaymentPubKeyHash
-  let client = scholarshipClient scholarship
-  if pkh == sAuthority scholarship
+  let scholTypedValidator = typedScholarshipValidator schol
+      oref = _ --Pick one at scholarshipScript with expectedDatum and correct value. 
+  
+  let lookups     = Constraints.typedValidatorLookups scholTypedValidator
+      constraints = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ ScholarshipRedeemer True)
+                 <> Constraints.mustBeSignedBy pkh
+
+  if pkh == sAuthority schol
       then do
-        void $ mapError' $ runStep (client expectedDatum) $ ScholarshipRedeemer {refund = False, emergencyRefund = True}
+        utx <- mapError (review _ConstraintResolutionContractError) (mkTxContract lookups constraints)
+        let adjustedUtx = Constraints.adjustUnbalancedTx utx
+        submitTxConfirmed adjustedUtx
         logInfo @String "Refunded Scholarship to Authority"
     else do
         logInfo @String "Not authority for scholarship"
@@ -173,11 +198,11 @@ emergencyRefundScholarship scholarship expectedDatum = do
 type ScholarshipSchema =  Endpoint "init" PaymentPubKeyHash
                       .\/ Endpoint "initManual" PaymentPubKeyHash
                       .\/ Endpoint "progress" ScholarshipDatum
-                      .\/ Endpoint "emergencyRefund" ScholarshipDatum
+                      .\/ Endpoint "refund" ScholarshipDatum
 
 endpoints :: Scholarship -> Contract () ScholarshipSchema Text ()
 endpoints scholarship = awaitPromise (init `select` progress `select` refund) >> endpoints scholarship
   where
     init  = endpoint @"init" $ initScholarshipOwnMoney scholarship
     progress = endpoint @"progress" $ completeMilestone scholarship
-    refund = endpoint @"emergencyRefund" $ emergencyRefundScholarship scholarship
+    refund = endpoint @"refund" $ refundScholarship scholarship
