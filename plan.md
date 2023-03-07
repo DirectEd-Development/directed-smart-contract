@@ -36,5 +36,10 @@ Changed redeemer to a single bool.
 Currently no deadline implemented. 
 
 # Next up
-Figure out type error in MkTx...
-Write code to choose correct oref to spend from script. 
+Update dependencies to use plutus-apps. 
+
+If this doesn't work, then do a shitty version of the oref chooser? 
+
+Either:
+    Update system so that we can use plutus V2, for instance 'DecoratedTxOut'.
+    or Figure out a way to choose correct oref by inspecting chainIndexTxOut???

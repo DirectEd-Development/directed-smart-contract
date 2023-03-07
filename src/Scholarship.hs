@@ -19,7 +19,6 @@ module Scholarship where
 
 import           Ledger                 hiding (mint, singleton)
 import qualified Ledger.Typed.Scripts   as Scripts
-import Plutus.Contract.StateMachine
 import Data.Aeson ( FromJSON, ToJSON )
 import          GHC.Generics
 import qualified PlutusTx
@@ -29,16 +28,13 @@ import           Ledger.Ada             as Ada hiding (divide)
 import           Ledger.Value           as Value
 import           Prelude                (Show (..),Semigroup (..), String)
 import qualified Prelude
-import Data.Text (Text, pack)
+import Data.Text (Text)
 import Plutus.Contract as Contract
-import Control.Monad (void, unless)
 import qualified VerifiedByToken
-import Ledger.Typed.Tx (TypedScriptTxOut(tyTxOutData))
-import qualified Ledger.Contexts as Contexts
 import Plutus.V1.Ledger.Api (ToData(toBuiltinData))
-import Wallet.Emulator.Wallet (ownOutputs)
 import Control.Lens (review)
 import Plutus.Contract.Request (mkTxContract)
+import qualified Data.Map
 
 data Scholarship = Scholarship
     { sAuthority        :: !PaymentPubKeyHash
@@ -137,10 +133,10 @@ initScholarshipOwnMoney schol pkhRecipient = do
       initialState    = ScholarshipDatum pkhRecipient 0
 
   let constraints = Constraints.mustPayToOtherScript scholScriptHash (Datum $ toBuiltinData initialState) scholValue
-      lookups = Constraints.unspentOutputs ownUtxos
+      lookups = Constraints.unspentOutputs ownUtxos :: ScriptLookups ScholTypes
 
   --We then build and submit the transaction based on the above constraints.
-  utx <- mapError (review _ConstraintResolutionContractError) (mkTxContract @() lookups constraints)
+  utx <- mapError (review _ConstraintResolutionContractError) (mkTxContract lookups constraints)
   let adjustedUtx = Constraints.adjustUnbalancedTx utx
   -- unless (utx == adjustedUtx) $
   --   logWarn @Text $ "Plutus.Contract.StateMachine.runInitialise: "
@@ -155,6 +151,16 @@ completeMilestone schol expectedDatum = do
       (ScholarshipDatum pkhRecipient previousMilestone) = expectedDatum
       milestoneToken     = Value.singleton (sCourseProviderSym schol) (TokenName $ getPubKeyHash (unPaymentPubKeyHash pkhRecipient)) 1
       oref = _ --Pick one at scholarshipScript with expectedDatum and correct value. 
+
+  allScholarships <- utxosAt $ scholarshipScrAddress schol
+  let scholUtxoList = Data.Map.toList allScholarships
+      maybeScholUtxo = find (\(txOref, citoTxOut) -> (toTxInfoTxOut citoTxOut)) scholUtxoList
+      -- dropUntilList (\list -> leq (sum (txOutValue . toTxOut . snd <$> list)) (scholValue + lovelaceValueOf 2_000_000)) scholUtxoList
+      -- valueToUse = sum (txOutValue . toTxOut . snd <$> utxosToUse)
+
+-- pickFound $ find (\state -> tyTxOutData (ocsTxOut state) Prelude.== datum) states
+--   where pickFound Nothing = Left $ ChooserError "No scholarships found with specified datum"
+--         pickFound (Just state) = Right state
 
   let lookups           = Constraints.mintingPolicy (VerifiedByToken.policy $ sCourseProvider schol)
                        <> Constraints.typedValidatorLookups scholTypedValidator
@@ -181,7 +187,7 @@ refundScholarship schol expectedDatum = do
   pkh <- Contract.ownPaymentPubKeyHash
   let scholTypedValidator = typedScholarshipValidator schol
       oref = _ --Pick one at scholarshipScript with expectedDatum and correct value. 
-  
+
   let lookups     = Constraints.typedValidatorLookups scholTypedValidator
       constraints = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ ScholarshipRedeemer True)
                  <> Constraints.mustBeSignedBy pkh
@@ -206,3 +212,11 @@ endpoints scholarship = awaitPromise (init `select` progress `select` refund) >>
     init  = endpoint @"init" $ initScholarshipOwnMoney scholarship
     progress = endpoint @"progress" $ completeMilestone scholarship
     refund = endpoint @"refund" $ refundScholarship scholarship
+
+
+-- scholarshipChooser :: ScholarshipDatum -> [OnChainState ScholarshipDatum ScholarshipRedeemer] -> Either SMContractError (OnChainState ScholarshipDatum ScholarshipRedeemer)
+-- scholarshipChooser datum states 
+--   = pickFound $ find (\state -> tyTxOutData (ocsTxOut state) Prelude.== datum) states
+--   where pickFound Nothing = Left $ ChooserError "No scholarships found with specified datum"
+--         pickFound (Just state) = Right state
+
