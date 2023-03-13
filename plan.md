@@ -31,9 +31,12 @@ Testing should either be done via the CLI (so that we can be sure of the validit
 The __copy files are snapshots of what the files used to look like, for reference. 
 
 
+
 # Changes Made
 Changed redeemer to a single bool. 
 Currently no deadline implemented. 
+Deleted 'app' folder containing executables. Will have to re-add later.
+Deleted 'testnet' folder containing testnet related items (scripts, addresses, keys...). Should re-introduce. 
 
 # Next up
 Update dependencies to use plutus-apps. 

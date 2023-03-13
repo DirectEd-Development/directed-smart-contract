@@ -1,0 +1,16 @@
+Fix Scholarship Script so that it actually compares for datumhash, not just datum. 
+
+Review ScholarshipPool Datum section to ensure it functions as expected. 
+Also fix the ada balancing portion of ScholarshipPool to account for updated methods. 
+
+Re-add the compile steps for the scripts based on new method from the course. 
+LOOK AT VALIDATOR ADDRESS BECH32?? IN CONVERSIONS.
+Add more traceIfFalse errors for debugging. 
+
+Do I need to import Ledger? 
+How to get currencySymbol without Ledger? 
+
+
+Changes:
+Scholarship datum is now required to be inline!
+
