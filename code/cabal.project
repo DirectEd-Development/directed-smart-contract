@@ -19,7 +19,6 @@ index-state:
 
 packages: 
     Utilities
-    Week02
     directed-smart-contract
 
 -- We never, ever, want this.
