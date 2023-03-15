@@ -30,18 +30,10 @@ Changed redeemer to a single bool.
 Currently no deadline implemented. 
 Deleted 'app' folder containing executables. Will have to re-add later.
 Changed Utilities: added code from Plutus.Scripts.Utils to allow conversions to CurrencySymbol, Validatorhash
+Deleted my old Utils file.
 
 # Next up
-Get Cabal repl working. 
-
-Consolidate my utils file and the new utils folder.
-
-Incorporate old /app file so that I can generate scripts, addresses... 
-
 Test using CLI.
-
-
-
 
 
 Look into VerifiedByToken to see if we can use ownCurrencySymbol again? 
