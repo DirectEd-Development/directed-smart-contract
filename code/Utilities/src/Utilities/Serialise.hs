@@ -10,7 +10,7 @@ module Utilities.Serialise
 
 import           Cardano.Api           (Error (displayError), PlutusScript,
                                         PlutusScriptV2, prettyPrintJSON,
-                                        writeFileJSON, writeFileTextEnvelope)
+                                        writeFileJSON, writeFileTextEnvelope, PlutusScriptVersion (PlutusScriptV2), Script (PlutusScript))
 import           Cardano.Api.Shelley   (PlutusScript (..), fromPlutusData,
                                         scriptDataToJsonDetailedSchema)
 import           Codec.Serialise       (serialise)

@@ -1,2 +1,14 @@
 cradle:
   cabal:
+    # - path: "./src"
+    #   component: "directed-smart-contract:lib:directed-smart-contract"
+    # - path: "./app"
+    #   component: "directed-smart-contract:exe:tokenName"
+    # - path: "./app"
+    #   component: "directed-smart-contract:exe:writeScholDatum"
+    # - path: "./app"
+    #   component: "directed-smart-contract:exe:writeUnit"
+    # - path: "./app"
+    #   component: "directed-smart-contract:exe:writeScripts"
+    # - path: "./app"
+    #   component: "directed-smart-contract:exe:writeScholRedeemer"

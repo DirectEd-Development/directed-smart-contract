@@ -29,11 +29,20 @@ Testing should either be done via the CLI (so that we can be sure of the validit
 Changed redeemer to a single bool. 
 Currently no deadline implemented. 
 Deleted 'app' folder containing executables. Will have to re-add later.
-Deleted 'testnet' folder containing testnet related items (scripts, addresses, keys...). Should re-introduce. 
 
 # Next up
-Investigate whether using Lucid/Mesh/PlutusSimpleModel is better for testing.
+Get Cabal repl working. 
+
+Consolidate my utils file and the new utils folder.
+
+Incorporate old /app file so that I can generate scripts, addresses... 
+
+Test using CLI.
+
+
+
+
 
 Look into VerifiedByToken to see if we can use ownCurrencySymbol again? 
 
-Consolidate my utils file and the new utils folder.
+Investigate whether using Lucid/Mesh/PlutusSimpleModel is better for testing.

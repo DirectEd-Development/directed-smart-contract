@@ -26,6 +26,10 @@ import qualified Prelude
 import Plutus.V2.Ledger.Api ()
 import Plutus.V2.Ledger.Contexts (txSignedBy, findOwnInput, getContinuingOutputs)
 import Plutus.V1.Ledger.Value (valueOf)
+import Utilities (wrap, validatorHash)
+import qualified Cardano.Api as Api
+import PlutusTx.TH (compile)
+import PlutusTx (applyCode, liftCode)
 
 
 -- import              Ledger                  hiding (mint, singleton)
@@ -35,15 +39,15 @@ import Plutus.V1.Ledger.Value (valueOf)
 -- import           Ledger.Ada                 as Ada hiding (divide)
 
 data Scholarship = Scholarship
-    { sAuthority        :: !PubKeyHash
-    , sAuthoritySym     :: !CurrencySymbol
-    , sSchool           :: !PubKeyHash
-    , sSchoolSym        :: !CurrencySymbol
-    , sCourseProvider   :: !PubKeyHash
-    , sCourseProviderSym:: !CurrencySymbol
-    , sAmount           :: !Integer
-    , sMilestones       :: !Integer
-    , sDeadline         :: !POSIXTime
+    { sAuthority        :: PubKeyHash
+    , sAuthoritySym     :: CurrencySymbol
+    , sSchool           :: PubKeyHash
+    , sSchoolSym        :: CurrencySymbol
+    , sCourseProvider   :: PubKeyHash
+    , sCourseProviderSym:: CurrencySymbol
+    , sAmount           :: Integer
+    , sMilestones       :: Integer
+    , sDeadline         :: POSIXTime
     } deriving (Show, Generic, Prelude.Eq)
 
 PlutusTx.makeLift ''Scholarship
@@ -95,26 +99,12 @@ mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = c
 
       _ -> False
 
--- data ScholTypes
--- instance Scripts.ValidatorTypes ScholTypes where
---     type instance DatumType ScholTypes = ScholarshipDatum
---     type instance RedeemerType ScholTypes = ScholarshipRedeemer
 
--- typedScholarshipValidator :: Scholarship -> Scripts.TypedValidator ScholTypes
--- typedScholarshipValidator schol = Scripts.mkTypedValidator @ScholTypes
---     ($$(PlutusTx.compile [|| mkScholarshipValidator ||])
---         `PlutusTx.applyCode` PlutusTx.liftCode schol)
---     $$(PlutusTx.compile [|| wrap ||])
---   where
---     wrap = Scripts.wrapValidator @ScholarshipDatum @ScholarshipRedeemer
+mkWrappedScholarshipValidator :: Scholarship -> BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkWrappedScholarshipValidator schol = wrap $ mkScholarshipValidator schol  
 
--- scholarshipValidator :: Scholarship -> Validator
--- scholarshipValidator = Scripts.validatorScript . typedScholarshipValidator
+scholarshipValidator :: Scholarship -> Validator
+scholarshipValidator schol = mkValidatorScript ($$(compile [|| mkWrappedScholarshipValidator ||]) `applyCode` liftCode schol )
 
--- scholarshipValHash :: Scholarship -> Ledger.ValidatorHash
--- scholarshipValHash = Scripts.validatorHash . typedScholarshipValidator
-
--- scholarshipScrAddress ::  Scholarship -> Ledger.Address
--- scholarshipScrAddress = scriptAddress . scholarshipValidator
-
-
+scholarshipValHash :: Scholarship -> Api.ScriptHash
+scholarshipValHash schol = validatorHash $ scholarshipValidator schol

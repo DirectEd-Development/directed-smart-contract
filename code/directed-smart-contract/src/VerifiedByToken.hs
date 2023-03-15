@@ -14,7 +14,7 @@ import           PlutusTx.Prelude       hiding (Semigroup(..), unless)
 import           Plutus.V2.Ledger.Tx
 import Plutus.V2.Ledger.Api as PlutusV2
 import PlutusTx (compile, liftCode, applyCode)
-import Utilities (wrapMintingPolicy)
+import Utilities ( wrapMintingPolicy, scriptCurrencySymbol )
 import Plutus.V1.Ledger.Value (flattenValue, valueOf)
 import Plutus.V2.Ledger.Contexts (txSignedBy)
 import Plutus.V1.Ledger.Address (toPubKeyHash)
@@ -53,9 +53,9 @@ mkWrappedPolicy = wrapMintingPolicy . mkPolicy
 policy :: PubKeyHash -> MintingPolicy
 policy pkh = mkMintingPolicyScript ($$(compile [|| mkWrappedPolicy ||]) `applyCode` liftCode pkh)
 
--- {-# INLINABLE curSymbol #-}
--- curSymbol :: PubKeyHash -> CurrencySymbol
--- curSymbol = scriptCurrencySymbol . policy
+{-# INLINABLE curSymbol #-}
+curSymbol :: PubKeyHash -> CurrencySymbol
+curSymbol = scriptCurrencySymbol . policy
 
 
 --validator beneficiary = mkValidatorScript ($$(compile [|| mkWrappedParameterizedVestingValidator ||]) `applyCode` liftCode beneficiary)

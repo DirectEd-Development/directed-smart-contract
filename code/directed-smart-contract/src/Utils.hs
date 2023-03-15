@@ -23,11 +23,6 @@ module Utils
 
 import           Cardano.Api                 as API
 import           Cardano.Api.Shelley         (Address (..), PlutusScript (..))
-import           Cardano.Crypto.Hash.Class   (hashToBytes)
-import           Cardano.Ledger.Credential   as Ledger
-import           Cardano.Ledger.Crypto       (StandardCrypto)
-import           Cardano.Ledger.Hashes       (ScriptHash (..))
-import           Cardano.Ledger.Keys         (KeyHash (..))
 import           Codec.Serialise             (serialise)
 import           Data.Aeson                  (decode, encode)
 import qualified Data.ByteString.Char8       as BS8
@@ -43,16 +38,11 @@ import           PlutusTx                    (Data (..))
 import qualified PlutusTx
 import           PlutusTx.Builtins           (toBuiltin)
 import           PlutusTx.Builtins.Internal  (BuiltinByteString (..))
-import qualified Ledger                      as Plutus
-import           Wallet.Emulator.Wallet      (WalletId (..))
-import           Wallet.Types                (ContractInstanceId (..))
-
 import qualified Scholarship                  
 import qualified ScholarshipPool
 import qualified VerifiedByToken
-import ScholarshipPool (PoolParams(pAuthority, pSchool, pCourseProvider, pAmount, pMilestones, pDeadline))
-import qualified TestFreeToken
-import Scholarship (ScholarshipRedeemer(emergencyRefund, ScholarshipRedeemer, refund))
+import Scholarship (ScholarshipRedeemer(ScholarshipRedeemer, refund))
+import Plutus.V2.Ledger.Api (MintingPolicy)
 
 dataToScriptData :: Data -> ScriptData
 dataToScriptData (Constr n xs) = ScriptDataConstructor n $ dataToScriptData <$> xs
@@ -137,7 +127,7 @@ unsafeStakePubKeyHash addr = case getCredentials addr of
 cidToString :: ContractInstanceId -> String
 cidToString = show . unContractInstanceId
 
-writeMintingPolicy :: FilePath -> Plutus.MintingPolicy -> IO (Either (FileError ()) ())
+writeMintingPolicy :: FilePath -> MintingPolicy -> IO (Either (FileError ()) ())
 writeMintingPolicy file = writeFileTextEnvelope @(PlutusScript PlutusScriptV1) file Nothing . PlutusScriptSerialised . SBS.toShort . LBS.toStrict . serialise . Plutus.getMintingPolicy
 
 unsafeTokenNameToHex :: TokenName -> String
