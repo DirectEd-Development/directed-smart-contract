@@ -32,8 +32,6 @@ import PlutusTx (compile, applyCode, liftCode)
 import Utilities (wrap, validatorHash)
 import qualified Cardano.Api               as Api
 
-
-
 -- Student can consume Acceptance NFT and Student Status NFT to create an instance 
 -- of the state machine which is their personal scholarship fund.
 

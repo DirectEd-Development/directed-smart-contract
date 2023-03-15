@@ -3,8 +3,7 @@
 # Scholarship.hs
 Validator must be rewritten to not use StateMachine
 Many supporting functions must also be rewritten
-ScholarshipChooser may need to be included in off-chain code.
-Off-chain code must be rewritten to not use runStep/runInitialize
+Off-chain code must be rewritten in CLI or with Mesh/Lucid.
 Simplify redeemer to only contain a single bool: refund. Currently allows D.E. to refund at any time, in case of mistakes. 
 
 # ScholarshipPool.hs
@@ -21,15 +20,9 @@ Extra utils may need to be created in order to fully implement the contracts via
 
 # Testing
 Testing should either be done via the CLI (so that we can be sure of the validity of the tests),
-    or by the emulator, so long as the transaction building step is NOT USING CONSTRAINTS. Is this possible? 
-
-    Within Tx generation code in plutus is a fully specified Tx type. We can either use the standard code, but inspect this Tx type for clearer
-    feedback, or we can attempt to fully specify it ourselves. 
-    The second option would require figuring out how to manage: fees, collateral, signatures, 
+    or via Mesh/Lucid. Alternatively using the Plutus Simple Model
 
 # Notes
-The __copy files are snapshots of what the files used to look like, for reference. 
-
 
 
 # Changes Made
@@ -39,10 +32,8 @@ Deleted 'app' folder containing executables. Will have to re-add later.
 Deleted 'testnet' folder containing testnet related items (scripts, addresses, keys...). Should re-introduce. 
 
 # Next up
-Update dependencies to use plutus-apps. 
+Investigate whether using Lucid/Mesh/PlutusSimpleModel is better for testing.
 
-If this doesn't work, then do a shitty version of the oref chooser? 
+Look into VerifiedByToken to see if we can use ownCurrencySymbol again? 
 
-Either:
-    Update system so that we can use plutus V2, for instance 'DecoratedTxOut'.
-    or Figure out a way to choose correct oref by inspecting chainIndexTxOut???
+Consolidate my utils file and the new utils folder.
