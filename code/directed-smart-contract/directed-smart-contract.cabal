@@ -66,14 +66,14 @@ executable writeScholDatum
   build-depends:
     directed-smart-contract,
 
--- executable tokenName
---   import: common-all
---   main-is: tokenName.hs
---   hs-source-dirs: app
---   ghc-options:
---     -threaded
---   build-depends:
---     directed-smart-contract,
+executable tokenName
+  import: common-all
+  main-is: tokenName.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    directed-smart-contract,
 
 executable writeUnit
   import: common-all

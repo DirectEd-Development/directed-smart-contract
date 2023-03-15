@@ -11,7 +11,6 @@ import qualified VerifiedByToken
 import Data.String (IsString(fromString))
 import Plutus.V2.Ledger.Api (POSIXTime(POSIXTime), Validator (Validator), MintingPolicy (getMintingPolicy))
 
-
 main :: IO ()
 main = do
     [authPKH, schoolPKH, coursePPKH, amount, milestones, deadline] <- getArgs
@@ -36,9 +35,9 @@ writeScholarshipValidator :: FilePath -> Scholarship.Scholarship -> IO ()
 writeScholarshipValidator filePath scholarship = 
   writeValidatorToFile filePath $ Scholarship.scholarshipValidator scholarship
 
--- writePoolValidator :: FilePath -> Scholarship.Scholarship -> IO ()
--- writePoolValidator filePath scholarship = 
---   writeValidatorToFile filePath $ ScholarshipPool.poolValidator scholarship (scholarshipValHash schol)
+writePoolValidator :: FilePath -> Scholarship.Scholarship -> IO ()
+writePoolValidator filePath scholarship = 
+  writeValidatorToFile filePath $ ScholarshipPool.poolValidator scholarship (scholarshipValidatorHash scholarship)
 
 writeSchoolPolicy :: FilePath -> Scholarship.Scholarship -> IO ()
 writeSchoolPolicy filePath scholarship = writeValidatorToFile filePath $ Validator $ getMintingPolicy $ VerifiedByToken.policy (Scholarship.sSchool scholarship) 
@@ -51,7 +50,7 @@ writeMilestonePolicy filePath scholarship = writeValidatorToFile filePath $ Vali
 
 writePolicies :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> Scholarship.Scholarship -> IO ()
 writePolicies poolPath scholPath schoolTokenPath acceptanceTokenPath milesTokenPath scholarship = do
-  -- _ <- writePoolValidator poolPath scholarship
+  _ <- writePoolValidator poolPath scholarship
   _ <- writeSchoolPolicy schoolTokenPath scholarship
   _ <- writeScholarshipValidator scholPath scholarship
   _ <- writeAcceptancePolicy acceptanceTokenPath scholarship

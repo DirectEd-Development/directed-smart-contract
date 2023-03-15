@@ -1,10 +1,12 @@
 module Utilities.Conversions
   ( Network (..)
   , validatorHash
+  , validatorHashOld
   , validatorAddressBech32
   , posixTimeFromIso8601
   , posixTimeToIso8601
   , scriptCurrencySymbol
+  , unsafeTokenNameToHex
   ) where
 
 import qualified Cardano.Api               as Script
@@ -20,7 +22,12 @@ import           Utilities.Serialise       (validatorToScript)
 import qualified PlutusTx.Builtins as Builtins
 import qualified Data.ByteString.Short as SBS
 import qualified Data.ByteString.Lazy as BSL
+import qualified Data.ByteString.Char8 as BS8
 import Codec.Serialise (serialise)
+import           PlutusTx.Builtins.Internal  (BuiltinByteString (..))
+import Data.Maybe (fromJust)
+import Cardano.Api (serialiseToRawBytesHex, SerialiseAsRawBytes (deserialiseFromRawBytes), AsType (AsAssetName))
+
 
 toCardanoScriptScript :: PV2.Script -> Script.Script Script.PlutusScriptV2
 toCardanoScriptScript =
@@ -47,6 +54,15 @@ mintingPolicyHash =
   . scriptHash
   . PV2.getMintingPolicy
   
+
+-- | Hash a 'PV2.Validator' script.
+validatorHashOld :: PV2.Validator -> PV2.ValidatorHash
+validatorHashOld =
+    PV2.ValidatorHash
+  . PV2.getScriptHash
+  . scriptHash
+  . PV2.getValidator
+
 {-# INLINABLE scriptCurrencySymbol #-}
 -- | The 'CurrencySymbol' of a 'MintingPolicy'. Code taken from Plutus.Script.Utils.V2.Scripts
 scriptCurrencySymbol :: PV2.MintingPolicy -> PV2.CurrencySymbol
@@ -75,3 +91,7 @@ posixTimeFromIso8601 s = do
 posixTimeToIso8601 :: POSIXTime -> String
 posixTimeToIso8601 t = Time.formatShow Time.iso8601Format $ Time.posixSecondsToUTCTime $ fromRational $ toRational t / 1000
 
+unsafeTokenNameToHex :: TokenName -> String
+unsafeTokenNameToHex = BS8.unpack . serialiseToRawBytesHex . fromJust . deserialiseFromRawBytes AsAssetName . getByteString . unTokenName
+  where
+    getByteString (BuiltinByteString bs) = bs

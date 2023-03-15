@@ -29,6 +29,7 @@ Testing should either be done via the CLI (so that we can be sure of the validit
 Changed redeemer to a single bool. 
 Currently no deadline implemented. 
 Deleted 'app' folder containing executables. Will have to re-add later.
+Changed Utilities: added code from Plutus.Scripts.Utils to allow conversions to CurrencySymbol, Validatorhash
 
 # Next up
 Get Cabal repl working. 

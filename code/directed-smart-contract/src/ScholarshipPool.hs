@@ -29,7 +29,7 @@ import qualified Plutus.V2.Ledger.Contexts as Contexts
 import Plutus.V2.Ledger.Contexts (findOwnInput, scriptOutputsAt, getContinuingOutputs)
 import Plutus.V1.Ledger.Value (valueOf)
 import PlutusTx (compile, applyCode, liftCode)
-import Utilities (wrap, validatorHash)
+import Utilities (wrap, validatorHash, validatorHashOld)
 import qualified Cardano.Api               as Api
 
 -- Student can consume Acceptance NFT and Student Status NFT to create an instance 
@@ -101,8 +101,11 @@ mkWrappedPoolValidator schol valHash = wrap $ mkPoolValidator schol valHash
 poolValidator :: Scholarship -> ValidatorHash -> Validator
 poolValidator schol valHash = mkValidatorScript ($$(compile [|| mkWrappedPoolValidator ||]) `applyCode` liftCode schol `applyCode` liftCode valHash)
 
-poolValHash :: Scholarship -> ValidatorHash -> Api.ScriptHash
-poolValHash schol valHash = validatorHash $ poolValidator schol valHash
+poolScriptHash :: Scholarship -> ValidatorHash -> Api.ScriptHash
+poolScriptHash schol valHash = validatorHash $ poolValidator schol valHash
+
+poolValHash :: Scholarship -> ValidatorHash -> ValidatorHash
+poolValHash schol valHash = validatorHashOld $ poolValidator schol valHash
 
 -- poolScrAddress :: Scholarship -> Address
 -- poolScrAddress = scriptAddress . poolValidator

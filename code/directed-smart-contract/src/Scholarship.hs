@@ -13,9 +13,7 @@
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-
 module Scholarship where
-
 import Plutus.V2.Ledger.Api as PlutusV2
 import          GHC.Generics
 import qualified PlutusTx
@@ -26,7 +24,7 @@ import qualified Prelude
 import Plutus.V2.Ledger.Api ()
 import Plutus.V2.Ledger.Contexts (txSignedBy, findOwnInput, getContinuingOutputs)
 import Plutus.V1.Ledger.Value (valueOf)
-import Utilities (wrap, validatorHash)
+import Utilities (wrap, validatorHash, validatorHashOld)
 import qualified Cardano.Api as Api
 import PlutusTx.TH (compile)
 import PlutusTx (applyCode, liftCode)
@@ -106,5 +104,8 @@ mkWrappedScholarshipValidator schol = wrap $ mkScholarshipValidator schol
 scholarshipValidator :: Scholarship -> Validator
 scholarshipValidator schol = mkValidatorScript ($$(compile [|| mkWrappedScholarshipValidator ||]) `applyCode` liftCode schol )
 
-scholarshipValHash :: Scholarship -> Api.ScriptHash
-scholarshipValHash schol = validatorHash $ scholarshipValidator schol
+scholarshipScriptHash :: Scholarship -> Api.ScriptHash
+scholarshipScriptHash schol = validatorHash $ scholarshipValidator schol
+
+scholarshipValidatorHash :: Scholarship -> ValidatorHash
+scholarshipValidatorHash schol = validatorHashOld $ scholarshipValidator schol
