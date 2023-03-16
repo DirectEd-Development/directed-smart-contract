@@ -2,8 +2,10 @@ amt=$1
 toAddrFile=$2
 skeyFile=$3
 changeAddr=$4
-datumHashFile=$5
+datumFile=$5
 txIn=$6
+
+TESTNET="--testnet-magic 2"
 
 toAddr=$(cat $toAddrFile)
 
@@ -12,7 +14,7 @@ echo "toAddrFile: $toAddrFile"
 echo "toAddr: $toAddr"
 echo "skeyFile: $skeyFile"
 echo "changeAddr: $changeAddr"
-echo "datumHashFile: $datumHashFile"
+echo "datumFile: $datumFile"
 echo "txIn: $txIn"
 
 txOut="${toAddr}+${amt}"
@@ -24,7 +26,7 @@ cardano-cli transaction build \
     --change-address $changeAddr \
     --tx-in $txIn \
     --tx-out $txOut \
-    --tx-out-datum-hash-file $datumHashFile \
+    --tx-out-inline-datum-file $datumFile \
     --out-file tx.body
 
 cardano-cli transaction sign \

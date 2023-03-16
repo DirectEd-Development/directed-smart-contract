@@ -12,3 +12,6 @@ schoolPkh=$(cat $schoolPkhFile)
 coursePrPkh=$(cat $coursePrPkhFile)
 
 cabal exec writeScripts $authPkh $schoolPkh $coursePrPkh $amount $milestones $deadline
+
+cardano-cli address build --payment-script-file scholarshipValidator.script --testnet-magic 2 --out-file scholarshipValidator.addr
+cardano-cli address build --payment-script-file poolValidator.script --testnet-magic 2 --out-file poolValidator.addr

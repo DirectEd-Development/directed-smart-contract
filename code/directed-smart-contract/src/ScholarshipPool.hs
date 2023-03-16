@@ -75,7 +75,7 @@ mkPoolValidator schol sValHash _ pkh ctx = isRefund ||
         -- The correctDatum that should be used in the output UTXO at the scholarship script. (Remember: it is expected to be inline)
 
         createsCorrectScholarship = outputsAtScholScript == [(OutputDatum correctDatum,singleton adaSymbol adaToken $ sAmount schol)]
-          -- There should be exactly one output at the scholarship script, with the expected datum and value.
+          -- There should be exactly one output at the scholarship script, with the expected datum and value. Note that the datum is expected to be inline.
 
         scriptInputs = getScriptInputs ctx :: [TxInInfo]
         valueWithdrew = foldMap (txOutValue . txInInfoResolved) scriptInputs
