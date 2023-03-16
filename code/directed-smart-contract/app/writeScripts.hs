@@ -3,7 +3,6 @@ module Main
     ) where
         
 import System.Environment   (getArgs)
-import           Cardano.Api                 as API
 import Utilities            (writeValidatorToFile)
 import Scholarship
 import qualified ScholarshipPool
