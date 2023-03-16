@@ -71,16 +71,16 @@ mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = c
   (ScholarshipRedeemer True) -> traceIfFalse "Refund not signed by authority" $ txSignedBy txInfo (sAuthority schol) --If refunding, must be signed by Authority 
 
   (ScholarshipRedeemer False)
-    | milestone < sMilestones schol -> traceIfFalse "Not signed by recipient" (txSignedBy txInfo ppkh) -- If completing intermediate milestone, must be signed by recipient, 
-                                    && traceIfFalse "Milestone token not burned" burnsMilestoneToken --must burn a single milestone token,
-                                    && traceIfFalse "Space here for a deadline requirement" True
-                                    && traceIfFalse "doesn't withdraw funding correctly" withdrawCorrect --Returns the remaining portion of scholarship to the script, with correct datum.
+    | milestone +1 < sMilestones schol -> traceIfFalse "Not signed by recipient" (txSignedBy txInfo ppkh) -- If completing intermediate milestone, must be signed by recipient, 
+                                       && traceIfFalse "Milestone token not burned" burnsMilestoneToken --must burn a single milestone token,
+                                       && traceIfFalse "Space here for a deadline requirement" True
+                                       && traceIfFalse "doesn't withdraw funding correctly" withdrawCorrect --Returns the remaining portion of scholarship to the script, with correct datum.
 
 
   (ScholarshipRedeemer False)
-    | milestone == sMilestones schol -> traceIfFalse "Not signed by recipient" (txSignedBy txInfo ppkh) -- If completing intermediate milestone, must be signed by recipient, 
-                                    && traceIfFalse "Milestone token not burned" burnsMilestoneToken --must burn a single milestone token,
-                                    && traceIfFalse "Space here for a deadline requirement" True
+    | milestone +1 == sMilestones schol -> traceIfFalse "Not signed by recipient" (txSignedBy txInfo ppkh) -- If completing intermediate milestone, must be signed by recipient, 
+                                        && traceIfFalse "Milestone token not burned" burnsMilestoneToken --must burn a single milestone token,
+                                        && traceIfFalse "Space here for a deadline requirement" True
 
   _ -> False
   where
