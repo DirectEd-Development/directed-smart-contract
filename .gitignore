@@ -21,5 +21,6 @@ cabal.project.local
 cabal.project.local~
 .HTF/
 .ghc.environment.*
-*.vkey
-*.skey
+# *.vkey
+# *.skey
+# While testing
