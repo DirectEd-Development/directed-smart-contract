@@ -1,5 +1,5 @@
 amt=100000000
-studentAddressFile=testStudent.addr
+studentPkhFile=testStudent.addr
 milestone=0
 skeyFile=testDonor.skey
 changeAddrFile=testDonor.addr
@@ -7,10 +7,10 @@ datumHashFile=datum.hash
 txIn=$1
 
 
-studentAddress=$(cat $studentAddressFile)
+studentPkh=$(cat $studentPkhFile)
 changeAddr=$(cat $changeAddrFile)
 
-cabal exec writeScholDatum $datumHashFile $studentAddress $milestone
+cabal exec writeScholDatum $datumHashFile $studentPkh $milestone
 
 scriptAddressFile=scholarshipValidator.addr
 cardano-cli address build --payment-script-file scholarshipValidator.script $TESTNET --out-file $scriptAddressFile

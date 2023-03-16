@@ -10,6 +10,8 @@ txClaim=$3
 txInCollat=$4
 recipientAddressFile=testStudent.addr
 recipientAddress=$(cat $recipientAddressFile)
+recipientPkhFile=testStudent.hash
+recipientPkh=$(cat testStudent.hash)
 recipientSkey=testStudent.skey
 
 scriptFile=scholarshipValidator.script
@@ -23,15 +25,15 @@ echo "txOut: $txOut"
 mintAmt=-1
 mintPolicyFile=milestonePolicy.script
 pid=$(cardano-cli transaction policyid --script-file $mintPolicyFile)
-tnHex=$(cabal exec tokenName -- $recipientAddress)
+tnHex=$(cabal exec tokenName -- $recipientPkh)
 v="$mintAmt $pid.$tnHex"
 
 datumFile=datumOld.hash
-cabal exec writeScholDatum $datumFile $recipientAddress $milestone
+cabal exec writeScholDatum $datumFile $recipientPkh $milestone
 
 nextMilestone=$(($milestone+1))
 newDatumFile=datumNew.hash
-cabal exec writeScholDatum $newDatumFile $recipientAddress $nextMilestone
+cabal exec writeScholDatum $newDatumFile $recipientPkh $nextMilestone
 
 redeemerFile=falseFalseRedeemer.json
 cabal exec writeScholRedeemer $redeemerFile False False

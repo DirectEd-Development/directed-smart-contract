@@ -7,7 +7,3 @@ do
     cardano-cli address key-hash --payment-verification-key-file test$USER.vkey --out-file test$USER.hash
     cardano-cli address build --payment-verification-key-file test$USER.vkey --testnet-magic 2 --out-file test$USER.addr
 done
-
-
-cabal repl
-

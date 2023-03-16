@@ -3,6 +3,7 @@
 #Here receiver is the person who is burning the token. (Generally assumed to be the recipient of the scholarship)
 amt=-1
 receiverAddrFile=testStudent.addr
+receiverPkhFile=testStudent.hash
 receiverSkeyFile=testStudent.skey
 mintingPolicyFile=$1
 oref1=$2
@@ -18,6 +19,7 @@ ppFile=protocol-parameters.json
 cardano-cli query protocol-parameters $TESTNET --out-file $ppFile
 
 receiverAddr=$(cat $receiverAddrFile)
+receiverPkh=$(cat $receiverPkhFile)
 
 unitFile=unit.json
 cabal exec writeUnit $unitFile
@@ -28,7 +30,7 @@ unsignedFile=tx.unsigned
 signedFile=tx.signed
 pid=$(cardano-cli transaction policyid --script-file $policyFile)
 
-tnHex=$(cabal exec tokenName -- $receiverAddr)
+tnHex=$(cabal exec tokenName -- $receiverPkh)
 
 v="$amt $pid.$tnHex"
 

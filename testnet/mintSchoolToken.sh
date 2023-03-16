@@ -1,8 +1,8 @@
 #!/bin/bash
 
 amt=1
-verifierAddrFile=testCP.addr
-verifierSkeyFile=testCP.skey
+verifierAddrFile=testSchool.addr
+verifierSkeyFile=testSchool.skey
 receiverAddrFile=testStudent.addr
 recieverPkhFile=testStudent.hash
 oref=$1
@@ -24,7 +24,7 @@ receiverPkh=$(cat $receiverPkhFile)
 unitFile=unit.json
 cabal exec writeUnit $unitFile
 
-policyFile=milestonePolicy.script
+policyFile=schoolPolicy.script
 
 unsignedFile=tx.unsigned
 signedFile=tx.signed

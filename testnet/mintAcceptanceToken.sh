@@ -1,10 +1,10 @@
 #!/bin/bash
 
 amt=1
-receiverAddr=testStudent.addr
 verifierAddrFile=testAuthority.addr
 verifierSkeyFile=testAuthority.skey
 receiverAddrFile=testStudent.addr
+recieverPkhFile=testStudent.hash
 oref=$1
 
 echo "receiver address file: $receiverAddrFile"
@@ -19,6 +19,7 @@ cardano-cli query protocol-parameters $TESTNET --out-file $ppFile
 
 verifierAddr=$(cat $verifierAddrFile)
 receiverAddr=$(cat $receiverAddrFile)
+receiverPkh=$(cat $receiverPkhFile)
 
 unitFile=unit.json
 cabal exec writeUnit $unitFile
@@ -29,7 +30,7 @@ unsignedFile=tx.unsigned
 signedFile=tx.signed
 pid=$(cardano-cli transaction policyid --script-file $policyFile)
 
-tnHex=$(cabal exec tokenName -- $receiverAddr)
+tnHex=$(cabal exec tokenName -- $receiverPkh)
 
 v="$amt $pid.$tnHex"
 

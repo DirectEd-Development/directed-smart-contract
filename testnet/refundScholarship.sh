@@ -5,10 +5,10 @@ expectedDatumFile=$3
 refundAddrFile=testAuthority.addr
 skeyFile=testAuthority.skey
 
-redeemerFile=falseTrueRedeemer.json
+redeemerFile=trueRedeemer.json
 refundAddr=$(cat $refundAddrFile)
 
-cabal exec writeScholRedeemer $redeemerFile False True
+cabal exec writeScholRedeemer $redeemerFile True
 
 cardano-cli transaction build \
     --babbage-era \
