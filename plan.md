@@ -37,6 +37,8 @@ Test using CLI.
 
 Write refund Pool script. 
 
+Figure out how to combine change and return collateral outputs. Or how to withdraw the fees from the change output. So that we don't require a larger collateral input. 
+
 Test if scholarshipPool having datum other than Unit causes an error!
 
 Look into VerifiedByToken to see if we can use ownCurrencySymbol again? 
