@@ -4,7 +4,8 @@ amt=1
 verifierAddrFile=testSchool.addr
 verifierSkeyFile=testSchool.skey
 receiverAddrFile=testStudent.addr
-recieverPkhFile=testStudent.hash
+receiverPkhFile=testStudent.hash
+TESTNET="--testnet-magic 2"
 oref=$1
 
 echo "receiver address file: $receiverAddrFile"
@@ -12,7 +13,6 @@ echo "amt: $amt"
 echo "verifier address file: $verifierAddrFile"
 echo "verifier signing key file: $verifierSkeyFile"
 echo "oref: $oref"
-
 
 ppFile=protocol-parameters.json
 cardano-cli query protocol-parameters $TESTNET --out-file $ppFile

@@ -101,3 +101,12 @@ executable writeScholRedeemer
     -threaded
   build-depends:
     directed-smart-contract,
+
+executable writePoolRedeemer
+  import: common-all
+  main-is: writePoolRedeemer.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    directed-smart-contract,

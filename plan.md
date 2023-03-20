@@ -35,7 +35,14 @@ Deleted my old Utils file.
 # Next up
 Test using CLI.
 
+Write refund Pool script. 
+
+Test if scholarshipPool having datum other than Unit causes an error!
 
 Look into VerifiedByToken to see if we can use ownCurrencySymbol again? 
 
 Investigate whether using Lucid/Mesh/PlutusSimpleModel is better for testing.
+
+Think about who is paying the fees! (Isn't this covered by the tokens?)
+
+Do we need to force/ask all donors to donate with inline-datum? Otherwise we can't access the datum? Or maybe it doesn't matter when we don't use datum in the script? 

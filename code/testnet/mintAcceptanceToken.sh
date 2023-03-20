@@ -4,7 +4,8 @@ amt=1
 verifierAddrFile=testAuthority.addr
 verifierSkeyFile=testAuthority.skey
 receiverAddrFile=testStudent.addr
-recieverPkhFile=testStudent.hash
+receiverPkhFile=testStudent.hash
+TESTNET="--testnet-magic 2"
 oref=$1
 
 echo "receiver address file: $receiverAddrFile"
