@@ -1,7 +1,3 @@
-#mustMint -1.
-#mustValidateIn
-#must put back (v - lovelaceValueOf (divide (sAmount scholarship) with milestone+1
-#Note time is measured in slots here.
 
 amount=100000000
 milestone=$1
@@ -28,8 +24,9 @@ pid=$(cardano-cli transaction policyid --script-file $mintPolicyFile)
 tnHex=$(cabal exec tokenName -- $recipientPkh)
 v="$mintAmt $pid.$tnHex"
 
+previousMilestone=$(($milestone-1))
 datumFile=datumOld.json
-cabal exec writeScholDatum $datumFile $recipientPkh $milestone
+cabal exec writeScholDatum $datumFile $recipientPkh $previousMilestone
 
 redeemerFile=falseRedeemer.json
 cabal exec writeScholRedeemer $redeemerFile False

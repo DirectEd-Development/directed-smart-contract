@@ -1,29 +1,9 @@
-## Remove dependency on StateMachine module
-
-# Scholarship.hs
-Validator must be rewritten to not use StateMachine
-Many supporting functions must also be rewritten
-Off-chain code must be rewritten in CLI or with Mesh/Lucid.
-Simplify redeemer to only contain a single bool: refund. Currently allows D.E. to refund at any time, in case of mistakes. 
-
-# ScholarshipPool.hs
-Nothing explicitly needs to be rewritten.
-However, structural review may be in order. 
-In paricular the rules for calculating withdrawUpTo
-
 # VerifiedByToken.hs
 Reinvestigate the weirdness involving useOwnCurrencySymbol? 
-If it doesn't work in the emulator, test in the CLI. 
-
-# Utils.hs
-Extra utils may need to be created in order to fully implement the contracts via the CLI. 
-
-# Testing
-Testing should either be done via the CLI (so that we can be sure of the validity of the tests),
-    or via Mesh/Lucid. Alternatively using the Plutus Simple Model
+Test in CLI
 
 # Notes
-
+Seems students will require about 3Ada collateral. 
 
 # Changes Made
 Changed redeemer to a single bool. 
@@ -33,6 +13,9 @@ Changed Utilities: added code from Plutus.Scripts.Utils to allow conversions to 
 Deleted my old Utils file.
 
 # Next up
+Look into what the error was? Looks like the collateral is returned normally and there is a single output to the change address of 2ish ada, as expected. So what goes wrong with low collateral???
+    Seems that after calculating for ~1.4ada collateral being taken out, the CLI wants to be able to return the remaining collateral to the owners wallet. Since 2ada-1.4 leaves less than minAda, it doesn't like it. 
+
 Test using CLI.
 
 Write refund Pool script. 
@@ -48,3 +31,6 @@ Investigate whether using Lucid/Mesh/PlutusSimpleModel is better for testing.
 Think about who is paying the fees! (Isn't this covered by the tokens?)
 
 Do we need to force/ask all donors to donate with inline-datum? Otherwise we can't access the datum? Or maybe it doesn't matter when we don't use datum in the script? 
+
+Make the script faster? Use a different compiler like Plutarch/Plutonomicon/...?
+
