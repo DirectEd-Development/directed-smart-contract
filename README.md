@@ -1,6 +1,8 @@
 # directed-smart-contract
 Plutus scripts for DirectEd Smart Contract.
 
+* In the [.devcontainer](.devcontainer/) directory, you'll find a Docker contained created by the IOG Education Team to create a local plutus development, made for the Plutus Pioneers Program Iteration 4.
+
 ### Overview:
 
 The smart contract manages scholarships in such a way that for a student to withdraw portions of the scholarship, they must be approved by three different institutions - the ‘Authority’, the ‘School’, and the ‘CourseProvider’. These institutions register their approval of a particular scholar by issuing a certain token to the scholar, which the smart contract verifies before allowing withdrawals. Note that a single instance of the smart contract allows for scholarships between a single Authority, a single School, and a single CourseProvider.

@@ -1,0 +1,112 @@
+cabal-version:      3.4
+name:               directed-smart-contract
+version:            0.1.0.0
+
+license: Apache-2.0
+author:             Rohan Mitta
+maintainer:         mitta.rohan@gmail.com
+-- Code shell taken partly from plutus-pioneers-program iteration 4 and partly from plutus-starter
+
+common common-all
+    build-depends:    base ^>=4.14.3.0
+                    , aeson
+                    , bytestring
+                    , containers
+                    , cardano-api
+                    , data-default
+                    -- , plutus-ledger
+                    , plutus-ledger-api
+                    -- , plutus-ledger-constraints
+                    -- , plutus-script-utils
+                    -- , plutus-contract
+                    , plutus-tx-plugin
+                    , plutus-tx
+                    , text
+                    , serialise
+                    , utilities
+                    , lens
+    default-language: Haskell2010
+    ghc-options: -Wall -fobject-code -fno-ignore-interface-pragmas
+                 -fno-omit-interface-pragmas -fno-strictness 
+                 -fno-spec-constr -fno-specialise -fexpose-all-unfoldings
+                 -fplugin-opt PlutusTx.Plugin:defer-errors
+
+common common-all-tests
+    import:           common-all
+    build-depends:    QuickCheck
+                    , tasty
+                    , plutus-simple-model
+
+library
+  -- Include this to import the ghc-options and language above 
+    import: common-all
+  -- This is the directory location where our onchain code files will go, and also a utility function for my project 
+    hs-source-dirs: src
+  -- These are the file names that will get called by our executable files listed below 
+    exposed-modules:
+      Scholarship
+      VerifiedByToken
+      ScholarshipPool
+      -- Utils
+
+
+-- This is the first executable file that will get called from the cabal exec command, and will be the main :: IO () files for our project 
+executable writeScholDatum
+-- Include this to import the ghc-options and language above 
+  import: common-all
+-- This is the file name token-policy.hs, one of the executable files 
+  main-is: writeScholDatum.hs
+-- This is the local directory location of token-policy.hs 
+  hs-source-dirs: app
+-- Always include this
+  ghc-options:
+    -threaded
+-- "My executable files have no imports, therefore I only need to include base >= 4.9 && < 5, and the project name"
+-- Don't understand the above line, the files do have imports.
+  build-depends:
+    directed-smart-contract,
+
+executable tokenName
+  import: common-all
+  main-is: tokenName.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    directed-smart-contract,
+
+executable writeUnit
+  import: common-all
+  main-is: writeUnit.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    directed-smart-contract,
+
+executable writeScripts
+  import: common-all
+  main-is: writeScripts.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    directed-smart-contract,
+
+executable writeScholRedeemer
+  import: common-all
+  main-is: writeScholRedeemer.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    directed-smart-contract,
+
+executable writePoolRedeemer
+  import: common-all
+  main-is: writePoolRedeemer.hs
+  hs-source-dirs: app
+  ghc-options:
+    -threaded
+  build-depends:
+    directed-smart-contract,
