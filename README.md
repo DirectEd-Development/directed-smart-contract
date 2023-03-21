@@ -32,7 +32,7 @@ The ‘CourseProvider’ is the institution in charge of running the course that
     3. *pCourseProvider* - which corresponds to the institution in charge of the course
     4. *pAmount* - the total amount (in lovelace) that each scholarship is worth
     5. *pMilestones* - the number of milestones in the course of education. Each time the student completes a milestone, they will be able to withdraw *pAmount*/*pMilestones* ADA from their scholarship. 
-    6. *pDeadline* - the deadline for completion of the course.
+    6. *pDeadline* - the deadline for completion of the course. (Currently Unused)
 2. The *pAuthority*, *pSchool* and *pCourseProvider* found in *PoolParams* can be used in VerifiedByToken.hs to define three minting policies for the three institution’s tokens. (Note that the minting policies require the minted token to be sent to the *PaymentPubKeyHash* specified in the *TokenName -* the smart contract scripts will then double check that the signature of that *PaymentPubKeyHash* is present in any transaction attempting to use these tokens as evidence towards a scholarship.) These tokens will be referred to as:
     1. The acceptance token, issued by *pAuthority* to imply acceptance into the scholarship programme.
     2. The student status token, issued by *pSchool* to imply the student came from that high school and had the required grades.
@@ -46,7 +46,7 @@ The ‘CourseProvider’ is the institution in charge of running the course that
 6. The scholarship script is designed as a state machine with the state being composed of the scholarship recipient’s *PaymentPubKeyHash* as well as the current *Milestone* The *Milestone* number is initialized at 0. Every time the recipient completes a milestone, and receives a milestone token from the *pCourseProvider* they can submit a transaction to the scholarship script that withdraws their next portion of scholarship funding. This transaction must satisfy the following conditions:
     1. It must burn a milestone token.
     2. It must be signed by the *PaymentPubKeyHash* listed in the state. 
-    3. It must validate before the *pDeadline* 
+    3. It must validate before the *pDeadline* (Note: Currently unused)
     4. It must withdraw *pAmount/pMilestones* lovelace and send the rest back to the scholarship script with the *Milestone* number increased by 1. (Or if we are on the last milestone, send nothing back to the script.)
-7. In the event that a student has not completed their scholarship by *pDeadline* the scholarship giving authority *pAuthority* may reclaim any ADA that has not been withdrawn by students, and put this towards future scholarships. Note that having such a deadline is essential to ensure ADA cannot become permanently locked in the contract.
+7. In the event that a student has not completed their scholarship by *pDeadline* the scholarship giving authority *pAuthority* may reclaim any ADA that has not been withdrawn by students, and put this towards future scholarships. Note that having such a deadline is essential to ensure ADA cannot become permanently locked in the contract.(Note: Currently unused)
 8. Until we are 100% confident in the security of these smart contracts, in the pool script and the scholarship script there is the option for *pAuthority* to reclaim any ADA sitting in the scripts. This is to be used in the event of a bug being discovered, so that the bug can be fixed and the ADA moved to the fixed smart contract.
