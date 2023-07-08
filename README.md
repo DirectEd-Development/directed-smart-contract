@@ -22,7 +22,7 @@ The ‘CourseProvider’ is the institution in charge of running the course that
 5. DirectEd issues tokens to students that are selected for the scholarship (i.e. make it through an application process)
 6. Any student with a token from both their high school and DirectEd may show these to the smart contract in order to set aside a certain pot of money as their personal scholarship fund. 
 7. Students then begin the course of education that the scholarship is designed for. Every time they successfully pass a milestone in this course, the course provider issues a token to them that represents this fact. The student can present this to the smart contract in order to withdraw a portion of their scholarship corresponding to that milestone. 
-8. If scholarship students fail to satisfy some of the conditions within the pre-specified time frame written in the smart contract, whatever funds remain are returned to the donor addresses.
+8. If scholarship students fail to satisfy some of the conditions within the pre-specified time frame written in the smart contract, whatever funds remain can be redirected to a wallet pre-specified by DirectEd. 
 
 ### Technical Workflow:
 
