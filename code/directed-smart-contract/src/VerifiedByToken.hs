@@ -11,7 +11,6 @@
 module VerifiedByToken where
 
 import           PlutusTx.Prelude       hiding (Semigroup(..), unless)
-import           Plutus.V2.Ledger.Tx
 import Plutus.V2.Ledger.Api as PlutusV2
 import PlutusTx (compile, liftCode, applyCode)
 import Utilities ( wrapMintingPolicy, scriptCurrencySymbol )
@@ -26,25 +25,23 @@ import Plutus.V1.Ledger.Address (toPubKeyHash)
 
 
 --This minting policy requires that the transaction is signed by the minting institution, and that the token is sent to the pkh specified in the tokenName. Burning is always allowed.
+-- We check the scriptPurpose in order to find the currencySymbol of this script. Then we demand that all minting done with this currencySymbol must either be a burn or signed and sent to specified pkh.
 {-# INLINABLE mkPolicy #-}
 mkPolicy :: PubKeyHash -> () -> ScriptContext -> Bool
-mkPolicy instPkh () ctx = case flattenValue $ txInfoMint txInfo of
-                            [(curSym,tn,n)]                                                          --We specifically demand that if any tokens are being minted, there is only a single token being minted/burned. Otherwise not sure how to determine which currencySymbol belongs to this script!
-                              | n < 0 -> True --Burning is allowed.    
-                              | n > 0 -> traceIfFalse "not signed by institution" signedByInstitution &&
-                                          traceIfFalse "must send to specified pkh" sentToNamedWallet --Assumes the tokenName is exactly a pkh, and that the pkh corresponds to the address the token was sent to.                         
-                              where
-                                txOuts = txInfoOutputs txInfo
-                                signedByInstitution = txSignedBy txInfo instPkh
-                                maybePkhReciever = find (\txOut -> valueOf (txOutValue txOut) curSym tn > 0) txOuts >>= toPubKeyHash . txOutAddress
-                                sentToNamedWallet = maybe False ((==) (unTokenName tn) . getPubKeyHash) maybePkhReciever
-
-                            mintingList
-                                | and $ (\(_,_,c)->c<0) <$> mintingList  -> True -- Burning everything is allowed.
-                                | otherwise -> traceIfFalse "must either burn multiple types of tokens, or mint a single type of token" False
-
+mkPolicy instPkh () ctx = all (\(_,tn,n) -> (n<0) || (n>0 && traceIfFalse "not signed by institution" signedByInstitution &&
+                                               traceIfFalse "must send to specified pkh" (sentToNamedWallet tn) )
+                                        ) tokensFromScript
   where
     txInfo = scriptContextTxInfo ctx
+    txOuts = txInfoOutputs txInfo
+    Minting curSym = scriptContextPurpose ctx
+    tokensFromScript = filter (\(c,_,_)->c==curSym) (flattenValue $ txInfoMint txInfo)
+    signedByInstitution = txSignedBy txInfo instPkh
+    maybePkhReciever tn = find (\txOut -> valueOf (txOutValue txOut) curSym tn > 0) txOuts >>= toPubKeyHash . txOutAddress
+    sentToNamedWallet tn = maybe False ((==) (unTokenName tn) . getPubKeyHash) (maybePkhReciever tn)
+
+  -- Is it possible that we can send a token to multiple people to get around this rule? Well, it's actually completely irrelevant. Because the students can send the tokens to anyone else if they want.
+  -- We should actually remove that restriction? Then verifiedbytoken would simply say, to mint must be signed by institution...
 
 {-# INLINABLE mkWrappedPolicy #-}
 mkWrappedPolicy :: PubKeyHash -> BuiltinData -> BuiltinData -> ()

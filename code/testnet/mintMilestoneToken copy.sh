@@ -1,31 +1,30 @@
 #!/bin/bash
 
-#Here receiver is the person who is burning the token. (Generally assumed to be the recipient of the scholarship)
-amt=-1
+amt=1
+TESTNET="--testnet-magic 2"
+verifierAddrFile=testCP.addr
+verifierSkeyFile=testCP.skey
 receiverAddrFile=testStudent.addr
 receiverPkhFile=testStudent.hash
-receiverSkeyFile=testStudent.skey
-mintingPolicyFile=$1
-oref1=$2
-oref2=$3
-TESTNET="--testnet-magic 2"
+oref=$1
 
 echo "receiver address file: $receiverAddrFile"
 echo "amt: $amt"
-echo "token oref: $oref1"
-echo "collateral oref: $oref2"
-
+echo "verifier address file: $verifierAddrFile"
+echo "verifier signing key file: $verifierSkeyFile"
+echo "oref: $oref"
 
 ppFile=protocol-parameters.json
 cardano-cli query protocol-parameters $TESTNET --out-file $ppFile
 
+verifierAddr=$(cat $verifierAddrFile)
 receiverAddr=$(cat $receiverAddrFile)
 receiverPkh=$(cat $receiverPkhFile)
 
 unitFile=unit.json
 cabal exec writeUnit $unitFile
 
-policyFile=acceptancePolicy.script
+policyFile=milestonePolicy.script
 
 unsignedFile=tx.unsigned
 signedFile=tx.signed
@@ -41,23 +40,24 @@ echo "minted value: $v"
 echo "verifier address: $verifierAddr"
 echo "receiver address: $receiverAddr"
 
-
+#Is 1.5 ada correct?
 cardano-cli transaction build \
     $TESTNET \
     --babbage-era \
-    --tx-in $oref1 \
-    --tx-in-collateral $oref2 \
+    --tx-in $oref \
+    --tx-in-collateral $oref \
+    --tx-out "$receiverAddr + 1500000 lovelace + $v" \
+    --change-address $verifierAddr \
     --mint "$v" \
     --mint-script-file $policyFile \
     --mint-redeemer-file $unitFile \
-    --change-address $receiverAddr \
     --protocol-params-file $ppFile \
-    --required-signer $receiverSkeyFile \
-    --out-file $unsignedFile \
+    --required-signer $verifierSkeyFile \
+    --out-file $unsignedFile 
 
 cardano-cli transaction sign \
     --tx-body-file $unsignedFile \
-    --signing-key-file $receiverSkeyFile \
+    --signing-key-file $verifierSkeyFile \
     $TESTNET \
     --out-file $signedFile
 

@@ -1,13 +1,14 @@
 amt=$1
 toAddrFile=$2
 skeyFile=$3
-changeAddr=$4
+changeAddrFile=$4
 datumFile=$5
 txIn=$6
 
 TESTNET="--testnet-magic 2"
 
 toAddr=$(cat $toAddrFile)
+changeAddr=$(cat $changeAddrFile)
 
 echo "amt: $amt"
 echo "toAddrFile: $toAddrFile"
