@@ -81,19 +81,37 @@ RUN cabal update
 # Add cabal to PATH
 RUN echo "export PATH=$PATH:/root/.cabal/bin" >> ~/.bashrc
 
-FROM haskell as cardano_cli
+FROM haskell as cardano_node
 
-# install cardano-cli (we use a different docker container for the actual node)
-# (These have to be the same version as the cardano-node image specified at `docker-compose.yml`)
-RUN wget https://github.com/rober-m/cardano-node/releases/download/1.35.5/$(arch)-linux-cardano-cli
-RUN chmod +x $(arch)-linux-cardano-cli
-RUN mv $(arch)-linux-cardano-cli /usr/bin/cardano-cli
+# install cardano-node binaries
+RUN wget https://update-cardano-mainnet.iohk.io/cardano-node-releases/cardano-node-1.35.5-linux.tar.gz \
+  && tar -xf cardano-node-1.35.5-linux.tar.gz -C /usr/bin \
+  && cardano-cli --version
 
 # node socket
-RUN echo "export CARDANO_NODE_SOCKET_PATH=/root/.cardano/preview/node.socket" >> ~/.bashrc
-RUN echo "export NETWORK=preview" >> ~/.bashrc
+RUN echo "export CARDANO_NODE_SOCKET_PATH=/ipc/node.socket" >> ~/.bashrc
+RUN mkdir -p ${HOME:-/root}/node-config
 
-FROM cardano_cli as kuber
+# Download cardano-node config
+RUN mkdir -p /ipc
+
+RUN  wget https://book.world.dev.cardano.org/environments/preview/config.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/db-sync-config.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/submit-api-config.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/topology.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/byron-genesis.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/alonzo-genesis.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/shelley-genesis.json \
+  && mv ./*.json ${HOME:-/root}/node-config/
+
+# start-node alias
+RUN echo "alias start-node='cardano-node run \
+	     --config ${HOME:-/root}/node-config/config.json \
+	     --topology ${HOME:-/root}/node-config/topology.json \
+	     --database-path ${HOME:-/root}/preview-db \
+	     --socket-path /ipc/node.socket'" >> ~/.bashrc
+
+FROM cardano_node as kuber
 
 # install kuber
 RUN wget https://github.com/rober-m/kuber/releases/download/babbage-era/$(arch)-linux-kuber
