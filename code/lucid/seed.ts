@@ -1,0 +1,1 @@
+export const secretSeed="device cruel flower weird shock ship mountain head move inside bounce recall nose attend patient source rifle lock creek myth mixture person exclude tell";
