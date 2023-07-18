@@ -120,6 +120,11 @@ export async function mintAuthToken(
   return txHash;
 }
 
+let a = '0' + '#' + PKH0
+
+console.log(a)
+console.log()
+
 export async function mintSchoolToken(
   details: AddressDetails,
 ): Promise<TxHash> {

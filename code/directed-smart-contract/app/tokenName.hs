@@ -14,3 +14,5 @@ main = do
     putStrLn $ unsafeTokenNameToHex tn
     
 -- Note this spits out the same input as it takes in when it takes a PKH string.
+
+-- This file no longer works for MilestoneToken.

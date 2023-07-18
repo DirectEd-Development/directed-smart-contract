@@ -21,7 +21,7 @@ const lucid = await Lucid.new(
     ),
     "Preview"
   );
-  
+
 
 // load local stored seed into lucid and read out 3 addresses
 lucid.selectWalletFromSeed(secretSeed, { accountIndex: 0 });

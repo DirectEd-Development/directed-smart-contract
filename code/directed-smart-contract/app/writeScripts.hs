@@ -9,6 +9,7 @@ import qualified ScholarshipPool
 import qualified VerifiedByToken
 import Data.String (IsString(fromString))
 import Plutus.V2.Ledger.Api (POSIXTime(POSIXTime), Validator (Validator), MintingPolicy (getMintingPolicy))
+import qualified MilestoneToken
 
 main :: IO ()
 main = do
@@ -24,7 +25,7 @@ constructScholarship auth school courseProvider amount milestones deadline =
       , sSchool         = fromString school
       , sSchoolSym      = VerifiedByToken.curSymbol $ fromString school  
       , sCourseProvider = fromString courseProvider
-      , sCourseProviderSym = VerifiedByToken.curSymbol $ fromString courseProvider   
+      , sCourseProviderSym = MilestoneToken.curSymbol $ fromString courseProvider   
       , sAmount         = amount                --For now 100_000_000
       , sMilestones     = milestones            --For now 2
       , sDeadline       = POSIXTime deadline    --UNUSED
@@ -45,7 +46,7 @@ writeAcceptancePolicy :: FilePath -> Scholarship.Scholarship -> IO ()
 writeAcceptancePolicy filePath scholarship = writeValidatorToFile filePath $ Validator $ getMintingPolicy $ VerifiedByToken.policy (Scholarship.sAuthority scholarship) 
 
 writeMilestonePolicy :: FilePath -> Scholarship.Scholarship -> IO ()
-writeMilestonePolicy filePath scholarship = writeValidatorToFile filePath $ Validator $ getMintingPolicy $ VerifiedByToken.policy (Scholarship.sCourseProvider scholarship) 
+writeMilestonePolicy filePath scholarship = writeValidatorToFile filePath $ Validator $ getMintingPolicy $ MilestoneToken.policy (Scholarship.sCourseProvider scholarship) 
 
 writePolicies :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> Scholarship.Scholarship -> IO ()
 writePolicies poolPath scholPath schoolTokenPath acceptanceTokenPath milesTokenPath scholarship = do

@@ -47,6 +47,7 @@ library
       Scholarship
       VerifiedByToken
       ScholarshipPool
+      MilestoneToken
       -- Utils
 
 

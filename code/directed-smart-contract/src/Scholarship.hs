@@ -28,6 +28,7 @@ import Utilities (wrap, validatorHash, validatorHashOld)
 import qualified Cardano.Api as Api
 import PlutusTx.TH (compile)
 import PlutusTx (applyCode, liftCode)
+import PlutusTx.Builtins.Class (stringToBuiltinByteString)
 
 
 -- import              Ledger                  hiding (mint, singleton)
@@ -86,8 +87,7 @@ mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = c
   where
     txInfo = scriptContextTxInfo ctx
     valueMinted = txInfoMint txInfo :: Value
-    burnsMilestoneToken = valueOf valueMinted (sCourseProviderSym schol) (TokenName $ getPubKeyHash ppkh) == (-1)
-
+    burnsMilestoneToken = valueOf valueMinted (sCourseProviderSym schol) (TokenName $ stringToBuiltinByteString $ toString ppkh) == (-1)
     scholInputValue = txOutValue . txInInfoResolved <$> findOwnInput ctx
     scholOutputs = getContinuingOutputs ctx
     correctDatum = ScholarshipDatum ppkh (milestone + 1)
