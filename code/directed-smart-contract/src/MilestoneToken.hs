@@ -19,21 +19,24 @@ import Plutus.V2.Ledger.Contexts (txSignedBy)
 import Plutus.V1.Ledger.Address (toPubKeyHash)
 import Data.String
 import Text.Read (readMaybe)
+import Data.List (last)
+import Data.Char
 
-{-# INLINABLE breakAtHash #-}
--- Breaks a string into componenets separated by hashes. Used assuming tn is in the format milestoneNumber#pkh
-breakAtHash :: String -> [String]
-breakAtHash [] = []
-breakAtHash ('#':xs) = []:breakAtHash xs
-breakAtHash (x:xs) = (x:y):ys
+{-# INLINABLE breakAt #-}
+-- Breaks a string into componenets separated by a character. Used assuming tn is in the format pkh#MilestoneNumber
+breakAt :: Char -> String -> [String]
+breakAt _ [] = []
+breakAt a (x:xs) 
+  | a == x = []:breakAt a xs
+  | otherwise = (x:y):ys
   where
-    (y:ys) = breakAtHash xs
+    (y:ys) = breakAt a xs
 
 --This minting policy requires that the transaction is signed by the minting institution, and that the token is sent to the pkh specified in the tokenName. Burning is always allowed.
 -- We check the scriptPurpose in order to find the currencySymbol of this script. Then we demand that all minting done with this currencySymbol must either be a burn or signed and sent to specified pkh.
 {-# INLINABLE mkPolicy #-}
-mkPolicy :: PubKeyHash -> () -> ScriptContext -> Bool
-mkPolicy instPkh () ctx = all (\(_,tn,n) -> (n<0) || (n>0 && traceIfFalse "not signed by institution" signedByInstitution &&
+mkPolicy :: Char -> PubKeyHash -> () -> ScriptContext -> Bool
+mkPolicy hashChar instPkh () ctx = all (\(_,tn,n) -> (n<0) || (n>0 && traceIfFalse "not signed by institution" signedByInstitution &&
                                                traceIfFalse "must send to specified pkh" (sentToNamedWallet tn) &&
                                                traceIfFalse "incorrect tn format" (correctTnFormat tn ) )
                                         ) tokensFromScript
@@ -44,20 +47,20 @@ mkPolicy instPkh () ctx = all (\(_,tn,n) -> (n<0) || (n>0 && traceIfFalse "not s
     tokensFromScript = filter (\(c,_,_)->c==curSym) (flattenValue $ txInfoMint txInfo)
     signedByInstitution = txSignedBy txInfo instPkh
     maybePkhReciever tn = find (\txOut -> valueOf (txOutValue txOut) curSym tn > 0) txOuts >>= toPubKeyHash . txOutAddress
-    tnParts tn = breakAtHash (toString tn)
-    walletByteString tn = unTokenName $ fromString (tnParts tn!!1) -- This could throw errors.
-    correctTnFormat tn = isJust (readMaybe (head ( tnParts tn )) :: Maybe Integer)
+    tnParts tn = breakAt hashChar (toString tn)
+    walletByteString tn = unTokenName . fromString . head . tnParts $ tn -- This could throw errors.
+    correctTnFormat tn = isJust (readMaybe . last . tnParts $ tn :: Maybe Integer)
 
     sentToNamedWallet tn = maybe False ((==) (walletByteString tn ) . getPubKeyHash) (maybePkhReciever tn)
 
 {-# INLINABLE mkWrappedPolicy #-}
-mkWrappedPolicy :: PubKeyHash -> BuiltinData -> BuiltinData -> ()
-mkWrappedPolicy = wrapMintingPolicy . mkPolicy
+mkWrappedPolicy :: Char -> PubKeyHash -> BuiltinData -> BuiltinData -> ()
+mkWrappedPolicy a = wrapMintingPolicy . mkPolicy a
 
-policy :: PubKeyHash -> MintingPolicy
-policy pkh = mkMintingPolicyScript ($$(compile [|| mkWrappedPolicy ||]) `applyCode` liftCode pkh)
+policy :: Char -> PubKeyHash -> MintingPolicy
+policy a pkh = mkMintingPolicyScript ($$(compile [|| mkWrappedPolicy ||]) `applyCode` liftCode a `applyCode` liftCode pkh )
 
 {-# INLINABLE curSymbol #-}
 curSymbol :: PubKeyHash -> CurrencySymbol
-curSymbol = scriptCurrencySymbol . policy
+curSymbol = scriptCurrencySymbol . (policy 'b')
 

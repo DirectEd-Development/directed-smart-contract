@@ -87,7 +87,7 @@ mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = c
   where
     txInfo = scriptContextTxInfo ctx
     valueMinted = txInfoMint txInfo :: Value
-    burnsMilestoneToken = valueOf valueMinted (sCourseProviderSym schol) (TokenName $ stringToBuiltinByteString $ toString ppkh) == (-1)
+    burnsMilestoneToken = valueOf valueMinted (sCourseProviderSym schol) (TokenName $ stringToBuiltinByteString $ show ppkh ++ "#" ++ show milestone) == (-1)
     scholInputValue = txOutValue . txInInfoResolved <$> findOwnInput ctx
     scholOutputs = getContinuingOutputs ctx
     correctDatum = ScholarshipDatum ppkh (milestone + 1)
@@ -99,7 +99,7 @@ mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = c
 
 
 mkWrappedScholarshipValidator :: Scholarship -> BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedScholarshipValidator schol = wrap $ mkScholarshipValidator schol  
+mkWrappedScholarshipValidator schol = wrap $ mkScholarshipValidator schol
 
 scholarshipValidator :: Scholarship -> Validator
 scholarshipValidator schol = mkValidatorScript ($$(compile [|| mkWrappedScholarshipValidator ||]) `applyCode` liftCode schol )
