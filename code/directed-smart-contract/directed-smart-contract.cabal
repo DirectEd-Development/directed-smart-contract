@@ -50,7 +50,6 @@ library
       -- Utils
 
 
--- This is the first executable file that will get called from the cabal exec command, and will be the main :: IO () files for our project 
 executable writeScholDatum
 -- Include this to import the ghc-options and language above 
   import: common-all

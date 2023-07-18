@@ -20,7 +20,6 @@ import qualified PlutusTx
 import           PlutusTx.Prelude       hiding (Semigroup(..), unless)
 import           Prelude                (Show (..))
 import qualified Prelude
--- import qualified VerifiedByToken ()
 import Plutus.V2.Ledger.Api ()
 import Plutus.V2.Ledger.Contexts (txSignedBy, findOwnInput, getContinuingOutputs)
 import Plutus.V1.Ledger.Value (valueOf)
@@ -28,13 +27,6 @@ import Utilities (wrap, validatorHash, validatorHashOld)
 import qualified Cardano.Api as Api
 import PlutusTx.TH (compile)
 import PlutusTx (applyCode, liftCode)
-
-
--- import              Ledger                  hiding (mint, singleton)
--- import qualified    Ledger.Typed.Scripts    as Scripts
--- import Ledger.Contexts                      as Contexts
--- import Ledger.Value                         as Value
--- import           Ledger.Ada                 as Ada hiding (divide)
 
 data Scholarship = Scholarship
     { sAuthority        :: PubKeyHash
@@ -50,21 +42,23 @@ data Scholarship = Scholarship
 
 PlutusTx.makeLift ''Scholarship
 
-newtype ScholarshipRedeemer = ScholarshipRedeemer {refund :: Bool} -- The redeemer is used only for refunding. refund can be used once the deadline has passed, and emergencyRefund can be used at any point.
+-- The redeemer is used only for refunding. refund can be used once the deadline has passed.
+newtype ScholarshipRedeemer = ScholarshipRedeemer {refund :: Bool} 
 PlutusTx.unstableMakeIsData ''ScholarshipRedeemer
 
 type Milestone = Integer
 
+ -- The state of the scholarship, which says who it is for and which milestone they are on. 
 data ScholarshipDatum = ScholarshipDatum PubKeyHash Milestone
-  deriving (Show, Generic, Prelude.Eq) -- The state of the scholarship, whih says who it is for and which milestone they are on. 
+  deriving (Show, Generic, Prelude.Eq)
 PlutusTx.unstableMakeIsData ''ScholarshipDatum
 
---The scholarship contract does the following:
+-- The scholarship contract does the following:
 -- cases on sRedeemer (true -> mustbeSignedbyAuthority)
--- false ->
---     cases on milestone number (< milestones -> signed by pkh, burns a token, withinDeadline, creates correctnextState)
---     (= milestones -> signedbyPkh, deadline)
--- otherwise false
+--    false ->
+--        cases on milestone number (< milestones -> signed by pkh, burns a token, withinDeadline, creates correctnextState)
+--        (= milestones -> signedbyPkh, deadline)
+--    otherwise false
 {-# INLINABLE mkScholarshipValidator #-}
 mkScholarshipValidator :: Scholarship -> ScholarshipDatum -> ScholarshipRedeemer -> ScriptContext -> Bool
 mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = case sRedeemer of
@@ -92,7 +86,7 @@ mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = c
     scholOutputs = getContinuingOutputs ctx
     correctDatum = ScholarshipDatum ppkh (milestone + 1)
     withdrawCorrect = case (scholInputValue, scholOutputs) of
-      (Just v, [output]) -> traceIfFalse "incorrect datum, or not inline" ((OutputDatum . Datum . toBuiltinData $ correctDatum) == txOutDatum output)  -- Note this requires there is only a single output, removing the possibility of students banding together to submit a single transaction.
+      (Just v, [output]) -> traceIfFalse "incorrect datum, or not inline" ((OutputDatum . Datum . toBuiltinData $ correctDatum) == txOutDatum output) 
                          && traceIfFalse "incorrect value" (txOutValue output == (v - singleton adaSymbol adaToken (divide (sAmount schol) $ sMilestones schol)))
 
       _ -> False
