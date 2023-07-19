@@ -12,6 +12,7 @@
 {-# LANGUAGE NumericUnderscores  #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module ScholarshipPool where
 
@@ -19,13 +20,14 @@ import Scholarship
 import qualified    PlutusTx
 import PlutusTx.Prelude                     hiding (Semigroup(..), unless)
 import Control.Lens (none)
-import Plutus.V2.Ledger.Api (ScriptContext (scriptContextTxInfo), TxInInfo (..), TxOut (..), ValidatorHash, PubKeyHash (getPubKeyHash), TxInfo (txInfoInputs, txInfoMint, txInfoSignatories), TokenName (TokenName), Datum (Datum), singleton, adaSymbol, adaToken, OutputDatum (OutputDatum, NoOutputDatum), Validator, mkValidatorScript)
+import Plutus.V2.Ledger.Api (ScriptContext (scriptContextTxInfo), TxInInfo (..), TxOut (..), ValidatorHash, PubKeyHash (getPubKeyHash), TxInfo (txInfoInputs, txInfoMint, txInfoSignatories, txInfoValidRange), TokenName (TokenName), Datum (Datum), singleton, adaSymbol, adaToken, OutputDatum (OutputDatum, NoOutputDatum), Validator, mkValidatorScript)
 import qualified Plutus.V2.Ledger.Contexts as Contexts
 import Plutus.V2.Ledger.Contexts (findOwnInput, scriptOutputsAt, getContinuingOutputs)
 import Plutus.V1.Ledger.Value (valueOf)
 import PlutusTx (compile, applyCode, liftCode)
 import Utilities (wrap, validatorHash, validatorHashOld)
 import qualified Cardano.Api               as Api
+import Plutus.V1.Ledger.Interval (after, before)
 
 -- Student can consume Acceptance NFT and Student Status NFT to create an instance 
 -- of the state machine which is their personal scholarship fund.
@@ -41,12 +43,14 @@ getScriptInputs ctx
 -- The pooling contract allows students to withdraw Ada for their scholarship and put it at the scholarship script, reserved for them. To do this, they must burn one acceptance token and one student token. 
 {-# INLINABLE mkPoolValidator #-}
 mkPoolValidator :: Scholarship -> ValidatorHash -> () -> PubKeyHash -> ScriptContext -> Bool
-mkPoolValidator schol sValHash _ pkh ctx = isRefund ||
-                                            (traceIfFalse "doesn't consume acceptance token" consumesAcceptaceToken
-                                            && traceIfFalse "doesn't consume student status token" consumesStudentToken
-                                            && traceIfFalse "doesn't create correct scholarship" createsCorrectScholarship
-                                            && traceIfFalse "should return excess ADA to the pool script" returnsExcessToScript)
-
+mkPoolValidator schol sValHash _ pkh ctx
+  | pkh == sAuthority schol = traceIfFalse "before deadline" deadlinePassed
+                              && traceIfFalse "must be signed by authority" signedByAuthority
+  | otherwise = traceIfFalse "deadline has passed" beforeDeadline
+                && traceIfFalse "doesn't consume acceptance token" consumesAcceptaceToken
+                && traceIfFalse "doesn't consume student status token" consumesStudentToken
+                && traceIfFalse "doesn't create correct scholarship" createsCorrectScholarship
+                && traceIfFalse "should return excess ADA to the pool script" returnsExcessToScript
 
     where
         txInfo = scriptContextTxInfo ctx
@@ -64,7 +68,7 @@ mkPoolValidator schol sValHash _ pkh ctx = isRefund ||
         -- The correctDatum that should be used in the output UTXO at the scholarship script. (Remember: it is expected to be inline)
 
         createsCorrectScholarship = outputsAtScholScript == [(OutputDatum correctDatum,singleton adaSymbol adaToken $ sAmount schol)]
-          -- There should be exactly one output at the scholarship script, with the expected datum and value. Note that the datum is expected to be inline.
+        -- There should be exactly one output at the scholarship script, with the expected datum and value. Note that the datum is expected to be inline.
 
         scriptInputs = getScriptInputs ctx :: [TxInInfo]
         valueWithdrew = foldMap (txOutValue . txInInfoResolved) scriptInputs
@@ -80,9 +84,15 @@ mkPoolValidator schol sValHash _ pkh ctx = isRefund ||
 
         returnsExcessToScript = traceIfFalse "doesn't withdrawUpToLimit" withdrawUpToLimit && traceIfFalse "continuing outputs don't have datum" contOutputsHaveDatum
 
-        isRefund = (pkh == sAuthority schol) && elem pkh (txInfoSignatories txInfo)
-        --If the supplied pkh (in the redeemer) is that of the authority, then this is the authority requesting a full refund in the event of a bug.
-        --In this case the transaction must also be signed by that pkh. 
+        beforeDeadline = sDeadline schol `after` txInfoValidRange txInfo
+        deadlinePassed =   sDeadline schol `before` txInfoValidRange txInfo
+
+        signedByAuthority = sAuthority schol `elem` txInfoSignatories txInfo
+        --If the supplied pkh (in the redeemer) is that of the authority, then this is the authority requesting a full refund.
+        --In this case the transaction must also be signed by that pkh.
+        --The deadline has to have passed for this.
+
+
 
 
 {-# INLINABLE  mkWrappedPoolValidator #-}
