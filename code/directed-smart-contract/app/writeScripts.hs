@@ -28,7 +28,7 @@ constructScholarship auth school courseProvider amount milestones deadline =
       , sCourseProviderSym = MilestoneToken.curSymbol $ fromString courseProvider   
       , sAmount         = amount                --For now 100_000_000
       , sMilestones     = milestones            --For now 2
-      , sDeadline       = POSIXTime deadline    --UNUSED
+      , sDeadline       = POSIXTime deadline
       }
 
 writeScholarshipValidator :: FilePath -> Scholarship.Scholarship -> IO ()

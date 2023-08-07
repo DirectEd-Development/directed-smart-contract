@@ -7,7 +7,6 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-
 module VerifiedByToken where
 
 import           PlutusTx.Prelude       hiding (Semigroup(..), unless)
@@ -20,7 +19,7 @@ import Plutus.V1.Ledger.Address (toPubKeyHash)
 
 
 --This minting policy requires that the transaction is signed by the minting institution, and that the token is sent to the pkh specified in the tokenName. Burning is always allowed.
--- We check the scriptPurpose in order to find the currencySymbol of this script. Then we demand that all minting done with this currencySymbol must either be a burn or signed and sent to specified pkh.
+--We check the scriptPurpose in order to find the currencySymbol of this script. Then we demand that all minting done with this currencySymbol must either be a burn or signed and sent to specified pkh.
 {-# INLINABLE mkPolicy #-}
 mkPolicy :: PubKeyHash -> () -> ScriptContext -> Bool
 mkPolicy instPkh () ctx = all (\(_,tn,n) -> (n<0) || (n>0 && traceIfFalse "not signed by institution" signedByInstitution &&
