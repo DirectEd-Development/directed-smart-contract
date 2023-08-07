@@ -148,12 +148,37 @@ export async function mintSchoolToken(
   return txHash;
 }
 
+/**
+ * 
+ * @param pkh 
+ * @param milestone 
+ * @returns The unit for the milestone token, where the milestone number has been converted to a 2-digit hex so that it will be represented as a single byte in plutus core.
+ */
+export function milestoneTokenUnit(
+  pkh: string,
+  milestone: bigint,
+): string {
+  const milestoneHex : string = milestone.toString(16)
+  var milestoneByteHex : string = milestoneHex
+  if (milestoneHex.length == 1) {
+    milestoneByteHex = "0" + milestoneHex
+  }
+  if (milestoneHex.length > 2) {
+    throw new Error("Milestones must be between 0 and 255 so they fit in a single byte");
+    
+  }
+  const unit: Unit = CPTokenPolicyID + milestoneByteHex + pkh;
+  return unit
+}
+
+// Milestones can only be from 0 to 255, since they must fit in a single byte.
 export async function mintMilestoneToken(
   details: AddressDetails,
+  milestone: bigint,
 ): Promise<TxHash> {
   const PKH: string = details.paymentCredential.hash;
   const address : Address = details.address.bech32;
-  const unit: Unit = CPTokenPolicyID + PKH;
+  const unit = milestoneTokenUnit(PKH,milestone)
 
   const tx = await lucid
     .newTx()
@@ -257,7 +282,6 @@ export async function completeMilestone(
     pkh: PKH,
     milestone: milestone,
   };
-  const milestoneTokenUnit : Unit = CPTokenPolicyID + PKH;
   const lovelaceForSchol : bigint = 100000000n;
   const totalMilestones : bigint = 2n;
 
@@ -272,7 +296,7 @@ export async function completeMilestone(
     if ( milestone < totalMilestones ) {
       var tx = await lucid
       .newTx()
-      .mintAssets({ [milestoneTokenUnit]: -1n }, Data.void())
+      .mintAssets({ [milestoneTokenUnit(PKH,milestone)]: -1n }, Data.void())
       .attachMintingPolicy(CPTokenScript)
       .validTo(Date.now() + 100000)
       .collectFrom([ourUTxO], Data.to(new Constr(0,[new Constr(0,[])]))) // I took this from the plutus.json file. How can I do this from false/true instead?
@@ -284,7 +308,7 @@ export async function completeMilestone(
     else {
       var tx = await lucid
       .newTx()
-      .mintAssets({ [milestoneTokenUnit]: -1n }, Data.void())
+      .mintAssets({ [milestoneTokenUnit(PKH,milestone)]: -1n }, Data.void())
       .attachMintingPolicy(CPTokenScript)
       .validTo(Date.now() + 100000)
       .collectFrom([ourUTxO], Data.to(new Constr(0,[new Constr(0,[])]))) // I took this from the plutus.json file. How can I do this from false/true instead?
@@ -363,7 +387,7 @@ export async function authorityEmergencyRefund(
 
 // Mint and send milestone token
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 2 });
-// console.log(await mintMilestoneToken(details4));
+// console.log(await mintMilestoneToken(details4,1));
 
 // Complete Milestone 1 and withdraw funding
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 4})
@@ -371,7 +395,7 @@ export async function authorityEmergencyRefund(
 
 // Mint and send milestone token
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 2 });
-// console.log(await mintMilestoneToken(details4));
+// console.log(await mintMilestoneToken(details4,2));
 
 // Complete Milestone 1 and withdraw funding
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 4})

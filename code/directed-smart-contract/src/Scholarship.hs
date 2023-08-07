@@ -20,7 +20,6 @@ import qualified PlutusTx
 import           PlutusTx.Prelude       hiding (Semigroup(..), unless)
 import           Prelude                (Show (..))
 import qualified Prelude
--- import qualified VerifiedByToken ()
 import Plutus.V2.Ledger.Api ()
 import Plutus.V2.Ledger.Contexts (txSignedBy, findOwnInput, getContinuingOutputs)
 import Plutus.V1.Ledger.Value (valueOf)
@@ -28,14 +27,6 @@ import Utilities (wrap, validatorHash, validatorHashOld)
 import qualified Cardano.Api as Api
 import PlutusTx.TH (compile)
 import PlutusTx (applyCode, liftCode)
-import PlutusTx.Builtins.Class (stringToBuiltinByteString)
-
-
--- import              Ledger                  hiding (mint, singleton)
--- import qualified    Ledger.Typed.Scripts    as Scripts
--- import Ledger.Contexts                      as Contexts
--- import Ledger.Value                         as Value
--- import           Ledger.Ada                 as Ada hiding (divide)
 
 data Scholarship = Scholarship
     { sAuthority        :: PubKeyHash
@@ -87,7 +78,7 @@ mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = c
   where
     txInfo = scriptContextTxInfo ctx
     valueMinted = txInfoMint txInfo :: Value
-    burnsMilestoneToken = valueOf valueMinted (sCourseProviderSym schol) (TokenName $ stringToBuiltinByteString $ show ppkh ++ "#" ++ show milestone) == (-1)
+    burnsMilestoneToken = valueOf valueMinted (sCourseProviderSym schol) (TokenName $ consByteString milestone (getPubKeyHash ppkh) ) == (-1)
     scholInputValue = txOutValue . txInInfoResolved <$> findOwnInput ctx
     scholOutputs = getContinuingOutputs ctx
     correctDatum = ScholarshipDatum ppkh (milestone + 1)
