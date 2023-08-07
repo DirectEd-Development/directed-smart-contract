@@ -82,11 +82,10 @@ mkScholarshipValidator schol (ScholarshipDatum ppkh milestone) sRedeemer ctx = c
   where
     txInfo = scriptContextTxInfo ctx
     valueMinted = txInfoMint txInfo :: Value
-    burnsMilestoneToken = valueOf valueMinted (sCourseProviderSym schol) (TokenName $ getPubKeyHash ppkh) == (-1)
+    burnsMilestoneToken = valueOf valueMinted (sCourseProviderSym schol) (TokenName $ consByteString (milestone + 1) (getPubKeyHash ppkh)) == (-1)
 
     beforeDeadline = sDeadline schol `after` txInfoValidRange txInfo
     deadlinePassed =  sDeadline schol `before` txInfoValidRange txInfo
-
 
     scholInputValue = txOutValue . txInInfoResolved <$> findOwnInput ctx
     scholOutputs = getContinuingOutputs ctx
