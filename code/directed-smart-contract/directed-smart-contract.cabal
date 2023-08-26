@@ -25,6 +25,10 @@ common common-all
                     , serialise
                     , utilities
                     , lens
+                    , QuickCheck
+                    , tasty
+                    , plutus-simple-model
+
     default-language: Haskell2010
     ghc-options: -Wall -fobject-code -fno-ignore-interface-pragmas
                  -fno-omit-interface-pragmas -fno-strictness 
@@ -110,3 +114,31 @@ executable writePoolRedeemer
     -threaded
   build-depends:
     directed-smart-contract,
+
+test-suite testVerifiedByToken
+    import:             common-all
+    type:               exitcode-stdio-1.0
+    main-is:            testVerifiedByToken.hs
+    hs-source-dirs:     tests
+    build-depends:      directed-smart-contract,
+
+test-suite testMilestoneToken
+    import:             common-all
+    type:               exitcode-stdio-1.0
+    main-is:            testMilestoneToken.hs
+    hs-source-dirs:     tests
+    build-depends:      directed-smart-contract,
+
+test-suite testScholarshipPool
+    import:             common-all
+    type:               exitcode-stdio-1.0
+    main-is:            testScholarshipPool.hs
+    hs-source-dirs:     tests
+    build-depends:      directed-smart-contract,
+
+test-suite testScholarship
+    import:             common-all
+    type:               exitcode-stdio-1.0
+    main-is:            testScholarship.hs
+    hs-source-dirs:     tests
+    build-depends:      directed-smart-contract,
