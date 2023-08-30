@@ -19,12 +19,12 @@ import { secretSeed } from "./seed.ts"
 
 // set blockfrost endpoint (add your own Blockfrost key here)
 const lucid = await Lucid.new(
-    new Blockfrost(
-      "https://cardano-preview.blockfrost.io/api/v0",
-      "previewRotaZGxMOMhVbiBSAciY5fRcPllSBJ8T"
-    ),
-    "Preview"
-  );
+  new Blockfrost(
+    "https://cardano-preprod.blockfrost.io/api/v0",
+    "preprodkVTexzRSG7nvhxXWegyOulGyNmSJyhx5"
+  ),
+  "Preprod"
+);
 
 // load local stored seed into lucid and read out 5 addresses (in order to test the full flow, in reality these addresses will belong to different parties).
 lucid.selectWalletFromSeed(secretSeed, { accountIndex: 0 });
@@ -103,14 +103,14 @@ const scholScriptHash: ScriptHash = scholScript.script
 /**
  * Mints an acceptance token, sending it directly to the student. Can only be succesfully called by the authority.
  * 
- * @param details The cardano address details of the student that the token is sent to
+ * @param address The cardano address of the student that the token is sent to
  * @returns The txHash of the submitted transaction. This can be checked against a blockchain explorer.
  */
 export async function mintAcceptanceToken(
-  details: AddressDetails,
+  address: Address,
 ): Promise<TxHash> {
+  const details : AddressDetails = getAddressDetails(address)
   const PKH: string = details.paymentCredential.hash;
-  const address : Address = details.address.bech32;
   const unit: Unit = acceptanceTokenPolicyID + PKH;
 
   const tx = await lucid
@@ -132,14 +132,14 @@ export async function mintAcceptanceToken(
 /**
  * Mints a student token, sending it directly to the student. Can only be succesfully called by the school.
  * 
- * @param details The cardano address details of the student that the token is sent to
+ * @param address The cardano address address of the student that the token is sent to
  * @returns The txHash of the submitted transaction. This can be checked against a blockchain explorer.
  */
 export async function mintStudentToken(
-  details: AddressDetails,
+  address: Address,
 ): Promise<TxHash> {
+  const details : AddressDetails = getAddressDetails(address)
   const PKH: string = details.paymentCredential.hash;
-  const address : Address = details.address.bech32;
   const unit: Unit = studentTokenPolicyID + PKH;
 
   const tx = await lucid
@@ -185,15 +185,15 @@ export function milestoneTokenUnit(
 /**
  * Mints a milestone token, sending it directly to the student. Can only be succesfully called by the course provider (CP).
  * 
- * @param details The cardano address details of the student that the token is sent to
+ * @param address The cardano address details of the student that the token is sent to
  * @returns The txHash of the submitted transaction. This can be checked against a blockchain explorer.
  */
 export async function mintMilestoneToken(
-  details: AddressDetails,
+  address: Address,
   milestone: bigint,
 ): Promise<TxHash> {
+  const details : AddressDetails = getAddressDetails(address)
   const PKH: string = details.paymentCredential.hash;
-  const address : Address = details.address.bech32;
   const unit = milestoneTokenUnit(PKH,milestone)
 
   const tx = await lucid
@@ -432,11 +432,11 @@ export async function deadlinePassedPoolRefund(
 
 // Mint and send acceptance token
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 0 });
-// console.log(await mintAcceptanceToken(details4));
+// console.log(await mintAcceptanceToken(addr4));
 
 // Mint and send student token
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 1 });
-// console.log(await mintStudentToken(details4));
+// console.log(await mintStudentToken(addr4));
 
 // Donate 200 Ada to PoolScript
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 3})
@@ -448,7 +448,7 @@ export async function deadlinePassedPoolRefund(
 
 // Mint and send milestone token
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 2 });
-// console.log(await mintMilestoneToken(details4,1n));
+// console.log(await mintMilestoneToken(addr4,1n));
 
 // Complete Milestone 1 and withdraw funding
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 4})
@@ -456,14 +456,11 @@ export async function deadlinePassedPoolRefund(
 
 // Mint and send milestone token
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 2 });
-// console.log(await mintMilestoneToken(details4,2n));
+// console.log(await mintMilestoneToken(addr4,2n));
 
 // Complete Milestone 2 and withdraw funding
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 4})
 // console.log(await completeMilestone(2n))
-
-
-
 
 // Authority Refund from schol script after deadline passed
 // lucid.selectWalletFromSeed(secretSeed, { accountIndex: 0})
