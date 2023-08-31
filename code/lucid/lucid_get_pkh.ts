@@ -12,7 +12,7 @@ const simonAddr : Address = "addr_test1qr7ccpy6e6cy2jfs94pph7tw6vlnzr3h553k306wc
 const simonDetails: AddressDetails = getAddressDetails(simonAddr);
 const simonPKH: string = simonDetails.paymentCredential.hash;
 
-const edmundAddr : Address = "addr_test1qr7ccpy6e6cy2jfs94pph7tw6vlnzr3h553k306wcrpwnhdc48wz039t2h5y636cvm3pyjtjwn53s2h8j22rak9xzvysxwqs6r"
+const edmundAddr : Address = "addr_test1qzzvs44jsjdjex8f59t8maatlznltqmm9rvhr4l2yjqhv6e0vdjfc5kdxrc5vfgtggq7xcj0td4vxz7hlledc5nqxwvq7d5q0t"
 const edmundDetails: AddressDetails = getAddressDetails(edmundAddr);
 const edmundPKH: string = edmundDetails.paymentCredential.hash;
 
